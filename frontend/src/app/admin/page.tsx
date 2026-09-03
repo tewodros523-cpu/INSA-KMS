@@ -16,6 +16,8 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { kmsApi } from '@/src/lib/api';
+import { RecentBlogsSection } from '@/src/components/dashboard/RecentBlogsSection';
+import { TopContributorsSection } from '@/src/components/dashboard/TopContributorsSection';
 
 interface AdminSummary {
   totalUsers: number;
@@ -153,6 +155,12 @@ export default function AdminDashboardPage() {
             </div>
           </>
         )}
+
+        {/* 3 Recent Blogs Section */}
+        <RecentBlogsSection limit={3} />
+
+        {/* Top 3 Active Contributors Section */}
+        <TopContributorsSection limit={3} />
 
         {/* Administration Navigation Quick Links */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

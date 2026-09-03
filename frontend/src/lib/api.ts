@@ -728,5 +728,24 @@ export const kmsApi = {
     deleteTopic: (topicId: string) => fetchApi<void>(`/discussions/${topicId}`, { method: 'DELETE' }),
     deleteReply: (topicId: string, replyId: string) => fetchApi<void>(`/discussions/${topicId}/replies/${replyId}`, { method: 'DELETE' }),
   },
+
+  // Analytics
+  analytics: {
+    getTopContributors: (limit = 3) =>
+      fetchApi<Array<{
+        rank: number;
+        employeeId: string;
+        name: string;
+        username: string;
+        email?: string;
+        department?: string;
+        jobTitle?: string;
+        profileImage?: string | null;
+        documents: number;
+        blogs: number;
+        articles: number;
+        totalContributions: number;
+      }>>(`/analytics/top-contributors?limit=${limit}`),
+  },
 };
 

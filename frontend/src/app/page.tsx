@@ -24,6 +24,8 @@ import {
 import Link from 'next/link';
 import { kmsApi } from '@/src/lib/api';
 import { useAuth } from '@/src/lib/auth-context';
+import { RecentBlogsSection } from '@/src/components/dashboard/RecentBlogsSection';
+import { TopContributorsSection } from '@/src/components/dashboard/TopContributorsSection';
 
 interface AdminSummary {
   totalUsers: number;
@@ -356,6 +358,12 @@ export default function DashboardOverviewPage() {
             />
           )}
         </div>
+
+        {/* 3 Recent Blogs — Visible in everyone's dashboard */}
+        <RecentBlogsSection limit={3} />
+
+        {/* Top 3 Active Employees / Contributors — Visible in everyone's dashboard */}
+        <TopContributorsSection limit={3} />
 
         {/* Contributor Dashboard */}
         {!isAdmin && (
