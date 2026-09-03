@@ -7,7 +7,7 @@ import { Breadcrumb } from '@/src/components/ui/Breadcrumb';
 import { Button } from '@/src/components/ui/Button';
 import { Badge } from '@/src/components/ui/Badge';
 import { LoadingState, EmptyState, ErrorState } from '@/src/components/ui/States';
-import { Bell, Check, CheckCheck, ExternalLink, FileText, CheckCircle2, UserCheck, ShieldAlert, Search, Layers } from 'lucide-react';
+import { Bell, Check, CheckCheck, ExternalLink, FileText, CheckCircle2, UserCheck, ShieldAlert, Search, Layers, MessageSquare } from 'lucide-react';
 import { kmsApi } from '@/src/lib/api';
 
 interface NotificationItem {
@@ -40,6 +40,9 @@ function formatTimestamp(iso: string): string {
 function getEventBadge(eventType?: string) {
   if (!eventType) return null;
   const type = eventType.toUpperCase();
+  if (type.startsWith('BLOG_') || type.includes('BLOG')) {
+    return { label: 'Blog', variant: 'blue' as const, icon: MessageSquare };
+  }
   if (type.startsWith('DOC_') || type.startsWith('DOCUMENT_')) {
     return { label: 'Document', variant: 'blue' as const, icon: FileText };
   }
