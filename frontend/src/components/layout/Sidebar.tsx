@@ -27,7 +27,9 @@ import {
   KeyRound,
   ScanLine,
   GitPullRequestArrow,
-  X
+  X,
+  BookOpen,
+  MessageSquare
 } from 'lucide-react';
 import { UserRole, hasRole } from '@/src/lib/auth';
 import { AuthUser } from '@/src/lib/auth-context';
@@ -46,6 +48,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ userRoles, user, mobileOpen, o
   const mainNav = [
     { href: '/', label: 'Dashboard', icon: LayoutDashboard, role: 'ROLE_VIEWER' },
     { href: '/library', label: 'Document Library', icon: Folder, role: 'ROLE_VIEWER' },
+    { href: '/blogs', label: 'Blogs & News', icon: FileText, role: 'ROLE_VIEWER' },
+    { href: '/discussions', label: 'Discussions & Forum', icon: Users, role: 'ROLE_VIEWER' },
     { href: '/articles/create', label: 'Create Article', icon: FileText, role: 'ROLE_CONTRIBUTOR' },
     { href: '/folders', label: 'Folders', icon: Folder, role: 'ROLE_CONTRIBUTOR' },
     { href: '/search', label: 'Advanced Search', icon: Search, role: 'ROLE_VIEWER' },
@@ -94,17 +98,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ userRoles, user, mobileOpen, o
 
   useEffect(() => {
     const fetchUnread = () => {
-      const token = typeof window !== 'undefined' ? sessionStorage.getItem('kms_access_token') : null;
+      if (typeof window === 'undefined') return;
+      const token = sessionStorage.getItem('kms_access_token');
       if (!token) return;
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081/api/v1';
-      fetch(`${API_BASE_URL}/notifications/unread-count`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-        .then((res) => (res.ok ? res.json() : null))
+      kmsApi.notifications.getUnreadCount()
         .then((data) => {
-          if (data != null) {
-            const count = typeof data === 'number' ? data : data?.count ?? data?.unreadCount ?? 0;
-            setUnreadCount(count);
+          if (data && typeof data.unreadCount === 'number') {
+            setUnreadCount(data.unreadCount);
           }
         })
         .catch(() => {});

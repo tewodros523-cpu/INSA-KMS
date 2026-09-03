@@ -55,6 +55,7 @@ spring:
     # table + saved_searches alert columns). Skip checksum validation so startup
     # is not blocked by that already-applied version.
     validate-on-migrate: false
+    repair-on-migrate: true
     # V4/V5 were applied to the Render database from files that are not in this
     # repository. Tolerate applied-but-missing migrations so startup is not blocked;
     # remove this once those two scripts are restored into db/migration.

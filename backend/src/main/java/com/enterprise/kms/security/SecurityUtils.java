@@ -33,4 +33,17 @@ public class SecurityUtils {
         }
         return "sub-" + getCurrentUsername();
     }
+
+    public static boolean isSystemAdmin() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) {
+            return false;
+        }
+        return auth.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN") ||
+                               a.getAuthority().equals("ROLE_SYSTEM_ADMINISTRATOR") ||
+                               a.getAuthority().equals("ADMIN") ||
+                               a.getAuthority().equals("SYSTEM_ADMINISTRATOR"));
+    }
 }
+

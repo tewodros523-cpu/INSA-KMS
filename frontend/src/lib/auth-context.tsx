@@ -96,15 +96,29 @@ async function tryRefreshToken(): Promise<string | null> {
   return null;
 }
 
+function isJwtExpired(token: string): boolean {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return true;
+    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+    if (!payload.exp) return false;
+    return Date.now() >= payload.exp * 1000 - 10000;
+  } catch {
+    return true;
+  }
+}
+
 /**
  * Try to get a valid token, refreshing silently if the current one is expired.
  * Returns null if no valid token can be obtained.
  */
 async function getValidToken(): Promise<string | null> {
-  let token = getStoredToken();
-  if (token) return token;
+  const token = getStoredToken();
+  if (token && !isJwtExpired(token)) {
+    return token;
+  }
 
-  // Token missing — try refresh
+  // Token missing or expired — try refresh
   const refreshed = await tryRefreshToken();
   if (refreshed) return refreshed;
 
@@ -141,11 +155,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (retry.ok) {
             const data = await retry.json();
             if (isMounted.current) {
+              const rawName = data.fullName || data.username;
+              const formattedName = rawName.replace(/Jane\s*(Doe)?\s*/gi, '').trim() || 'Contributor';
               setUser({
                 id: data.id,
                 username: data.username,
                 email: data.email,
-                fullName: data.fullName || data.username,
+                fullName: formattedName,
                 department: data.department,
                 roles: (data.roles || []) as UserRole[],
               });
@@ -171,11 +187,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const data = await res.json();
       if (isMounted.current) {
+        const rawName = data.fullName || data.username;
+        const formattedName = rawName.replace(/Jane\s*(Doe)?\s*/gi, '').trim() || 'Contributor';
         setUser({
           id: data.id,
           username: data.username,
           email: data.email,
-          fullName: data.fullName || data.username,
+          fullName: formattedName,
           department: data.department,
           roles: (data.roles || []) as UserRole[],
         });

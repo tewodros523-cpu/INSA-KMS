@@ -530,6 +530,48 @@ public class DocumentController {
                 .body(resource);
     }
 
+    /** In-page document text extraction for DOCX, TXT, MD, CSV files. */
+    @GetMapping("/{id}/text")
+    @PreAuthorize("hasAnyRole('ROLE_VIEWER', 'ROLE_CONTRIBUTOR', 'ROLE_CONTENT_OWNER', 'ROLE_COMPLIANCE_OFFICER', 'ROLE_IT_SECURITY', 'ROLE_ADMIN')")
+    public ResponseEntity<Map<String, Object>> getDocumentTextContent(@PathVariable UUID id) {
+        permissionService.requireDocumentAccess(id, PermissionService.VIEW);
+        Map<String, Object> payload = documentService.prepareDownload(id);
+        java.nio.file.Path path = (java.nio.file.Path) payload.get("path");
+        String fileName = String.valueOf(payload.get("fileName"));
+
+        List<String> paragraphs = new java.util.ArrayList<>();
+        try {
+            if (fileName.toLowerCase().endsWith(".docx")) {
+                try (java.util.zip.ZipFile zipFile = new java.util.zip.ZipFile(path.toFile())) {
+                    var entry = zipFile.getEntry("word/document.xml");
+                    if (entry != null) {
+                        try (java.io.InputStream is = zipFile.getInputStream(entry)) {
+                            javax.xml.parsers.DocumentBuilderFactory dbf = javax.xml.parsers.DocumentBuilderFactory.newInstance();
+                            dbf.setNamespaceAware(true);
+                            org.w3c.dom.Document xmlDoc = dbf.newDocumentBuilder().parse(is);
+                            org.w3c.dom.NodeList nodeList = xmlDoc.getElementsByTagNameNS("*", "p");
+                            for (int i = 0; i < nodeList.getLength(); i++) {
+                                String text = nodeList.item(i).getTextContent();
+                                if (text != null && !text.isBlank()) {
+                                    paragraphs.add(text.trim());
+                                }
+                            }
+                        }
+                    }
+                }
+            } else if (fileName.toLowerCase().endsWith(".txt") || fileName.toLowerCase().endsWith(".md") || fileName.toLowerCase().endsWith(".csv") || fileName.toLowerCase().endsWith(".json")) {
+                paragraphs = java.nio.file.Files.readAllLines(path);
+            }
+        } catch (Exception e) {
+            // fallback gracefully
+        }
+
+        return ResponseEntity.ok(Map.of(
+                "fileName", fileName,
+                "paragraphs", paragraphs
+        ));
+    }
+
     /** FR-20: create a secure share link with configurable expiry and optional password. */
     @PostMapping("/{id}/share-link")
     @PreAuthorize("hasAnyRole('ROLE_CONTRIBUTOR', 'ROLE_CONTENT_OWNER', 'ROLE_ADMIN')")
@@ -727,7 +769,7 @@ public class DocumentController {
         int dotIdx = fileName.lastIndexOf('.');
         if (dotIdx >= 0) extension = fileName.substring(dotIdx + 1).toLowerCase();
 
-        String downloadUrl = "/api/v1/documents/" + documentId + "/download";
+        String downloadUrl = "http://localhost:8081/api/v1/documents/" + documentId + "/download";
 
         String protocolUri = null;
         String openMethod = "browser";
@@ -746,10 +788,10 @@ public class DocumentController {
                 openMethod = "microsoft-powerpoint";
             }
             case "pdf" -> {
-                openMethod = "browser";
+                openMethod = "pdf-viewer";
             }
             default -> {
-                openMethod = "download";
+                openMethod = "desktop-app";
             }
         }
 

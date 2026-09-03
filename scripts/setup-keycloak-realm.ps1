@@ -103,7 +103,7 @@ function Create-User {
 
 Create-User "admin" "admin@kms.internal" "System" "Administrator" "admin123" @("CONFIGURE_TOTP")
 Create-User "owner" "owner@kms.internal" "Content" "Owner" "owner123"
-Create-User "contributor" "user@kms.internal" "Jane" "Contributor" "user123"
+Create-User "contributor" "user@kms.internal" "Contributor" "" "user123"
 Create-User "viewer" "viewer@kms.internal" "John" "Viewer" "viewer123"
 Create-User "compliance" "compliance@kms.internal" "Alice" "Compliance" "compliance123"
 Create-User "security" "security@kms.internal" "Bob" "Security" "security123"

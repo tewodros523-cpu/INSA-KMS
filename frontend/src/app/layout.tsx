@@ -1,6 +1,7 @@
 import React from 'react';
 import './globals.css';
 import { AuthProvider } from '@/src/lib/auth-context';
+import { DiscussionWidget } from '@/src/components/DiscussionWidget/DiscussionWidget';
 
 export const metadata = {
   title: 'INSA Knowledge Management System — INSA KMS',
@@ -20,7 +21,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="bg-slate-50 font-sans text-slate-900 antialiased">
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          {children}
+          <DiscussionWidget />
+        </AuthProvider>
       </body>
     </html>
   );

@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { GlobalSearchModal } from './GlobalSearchModal';
 import { useAuth } from '@/src/lib/auth-context';
 import { AuthUser } from '@/src/lib/auth-context';
+import { kmsApi } from '@/src/lib/api';
 
 interface TopHeaderProps {
   user?: AuthUser | null;
@@ -19,17 +20,13 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ user, onToggleMobileMenu }
 
   React.useEffect(() => {
     const fetchUnread = () => {
-      const token = typeof window !== 'undefined' ? sessionStorage.getItem('kms_access_token') : null;
+      if (typeof window === 'undefined') return;
+      const token = sessionStorage.getItem('kms_access_token');
       if (!token) return;
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081/api/v1';
-      fetch(`${API_BASE_URL}/notifications/unread-count`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-        .then((res) => (res.ok ? res.json() : null))
+      kmsApi.notifications.getUnreadCount()
         .then((data) => {
-          if (data != null) {
-            const count = typeof data === 'number' ? data : data?.count ?? data?.unreadCount ?? 0;
-            setUnreadCount(count);
+          if (data && typeof data.unreadCount === 'number') {
+            setUnreadCount(data.unreadCount);
           }
         })
         .catch(() => {});

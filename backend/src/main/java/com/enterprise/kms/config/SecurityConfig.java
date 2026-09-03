@@ -3,6 +3,7 @@ package com.enterprise.kms.config;
 import com.enterprise.kms.security.KeycloakJwtAuthenticationConverter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -33,6 +34,7 @@ public class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
+                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers(
                     "/api/v1/health",
                     "/health/**",
@@ -40,6 +42,8 @@ public class SecurityConfig {
                     "/v3/api-docs/**",
                     "/api/v1/shares/**",
                     "/api/v1/documents/media/**",
+                    "/api/v1/media/**",
+                    "/images/**",
                     "/api/v1/auth/forgot-password",
                     "/api/v1/auth/forced-password-change",
                     "/api/v1/auth/login"
@@ -56,16 +60,21 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOriginPatterns(List.of(
+        configuration.setAllowedOrigins(List.of(
+            "http://localhost:3001",
             "http://localhost:3000",
+            "http://127.0.0.1:3001",
             "http://127.0.0.1:3000",
             "http://localhost:8080",
-            "http://localhost:8081"
+            "http://localhost:8081",
+            "http://127.0.0.1:8080",
+            "http://127.0.0.1:8081"
         ));
         configuration.setAllowedMethods(List.of(
             "GET",
             "POST",
             "PUT",
+            "PATCH",
             "DELETE",
             "OPTIONS",
             "HEAD"
@@ -75,7 +84,15 @@ public class SecurityConfig {
             "Content-Type",
             "X-Requested-With",
             "Accept",
-            "Origin"
+            "Origin",
+            "Access-Control-Request-Method",
+            "Access-Control-Request-Headers"
+        ));
+        configuration.setExposedHeaders(List.of(
+            "Authorization",
+            "Content-Type",
+            "Location",
+            "Content-Disposition"
         ));
         configuration.setAllowCredentials(true);
 
@@ -84,4 +101,3 @@ public class SecurityConfig {
         return source;
     }
 }
-

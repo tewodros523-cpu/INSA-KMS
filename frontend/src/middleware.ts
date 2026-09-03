@@ -6,29 +6,33 @@ const PUBLIC_PATHS = [
   '/login',
   '/auth/callback',
   '/_next',
+  '/images',
   '/favicon.ico',
   '/api',
 ];
 
 function isPublicPath(pathname: string): boolean {
-  return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/') || pathname.startsWith(p));
+  if (pathname.startsWith('/_next') || pathname.startsWith('/images') || pathname.startsWith('/api')) {
+    return true;
+  }
+  if (/\.(?:svg|png|jpg|jpeg|gif|webp|css|js|ico|woff|woff2|ttf|eot)$/i.test(pathname)) {
+    return true;
+  }
+  return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/'));
 }
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Always allow public paths
+  // Always allow public paths & static assets
   if (isPublicPath(pathname)) {
     return NextResponse.next();
   }
 
   // Check for token in cookie (set by client after OIDC callback)
-  // Note: sessionStorage is client-only so we use a cookie as the middleware signal.
-  // The real authoritative check is always the backend (Spring Security / JWT).
   const tokenCookie = request.cookies.get('kms_auth_present');
 
   if (!tokenCookie || tokenCookie.value !== 'true') {
-    // No auth signal ? redirect to login, preserving intended destination
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('from', pathname);
     return NextResponse.redirect(loginUrl);
@@ -38,8 +42,7 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // Match all routes except static files and Next.js internals
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|_next/data|images|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|css|js)$).*)',
   ],
 };

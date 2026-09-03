@@ -157,8 +157,8 @@
     {
       "username": "contributor",
       "email": "user@kms.internal",
-      "firstName": "Jane",
-      "lastName": "Contributor",
+      "firstName": "Contributor",
+      "lastName": "",
       "enabled": true,
       "emailVerified": true,
       "credentials": [

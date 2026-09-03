@@ -1,3 +1,15 @@
+const fs = require('fs');
+
+// Automatically normalize working directory casing on Windows to prevent Webpack casing warnings & client errors
+try {
+  const realCwd = fs.realpathSync.native ? fs.realpathSync.native(process.cwd()) : fs.realpathSync(process.cwd());
+  if (process.cwd() !== realCwd) {
+    process.chdir(realCwd);
+  }
+} catch (e) {
+  // Ignore fallback errors
+}
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,

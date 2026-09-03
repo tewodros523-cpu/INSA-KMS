@@ -44,3 +44,5 @@ certs/*.jks
 
 # TypeScript build cache
 *.tsbuildinfo
+
+backend/kms-storage-data/
