@@ -9,11 +9,13 @@ import {
   FileText, 
   BookOpen, 
   FileEdit, 
-  User as UserIcon, 
   Flame, 
   Sparkles, 
   Building2, 
-  Briefcase 
+  Briefcase,
+  Calendar,
+  Pin,
+  Clock
 } from 'lucide-react';
 import { kmsApi } from '@/src/lib/api';
 
@@ -30,6 +32,9 @@ export interface TopContributor {
   blogs: number;
   articles: number;
   totalContributions: number;
+  yearMonth?: string;
+  monthLabel?: string;
+  evaluatedAt?: string;
 }
 
 interface TopContributorsSectionProps {
@@ -41,7 +46,7 @@ interface TopContributorsSectionProps {
 export const TopContributorsSection: React.FC<TopContributorsSectionProps> = ({
   limit = 3,
   title = 'Top Active Contributors',
-  subtitle = 'Recognizing the most active knowledge creators across Documents, Blogs, and Articles',
+  subtitle = 'Employees evaluated on monthly performance — rankings remain pinned for the month',
 }) => {
   const [contributors, setContributors] = useState<TopContributor[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -50,7 +55,7 @@ export const TopContributorsSection: React.FC<TopContributorsSectionProps> = ({
   const fetchContributors = () => {
     setIsLoading(true);
     setError(null);
-    kmsApi.analytics.getTopContributors(limit)
+    kmsApi.analytics.getTopContributors(undefined, limit)
       .then((data) => {
         setContributors(Array.isArray(data) ? data : []);
       })
@@ -64,6 +69,18 @@ export const TopContributorsSection: React.FC<TopContributorsSectionProps> = ({
   useEffect(() => {
     fetchContributors();
   }, [limit]);
+
+  const activeMonthLabel = contributors.length > 0 && contributors[0].monthLabel
+    ? contributors[0].monthLabel
+    : new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(new Date());
+
+  const evaluationDate = contributors.length > 0 && contributors[0].evaluatedAt
+    ? new Date(contributors[0].evaluatedAt).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      })
+    : null;
 
   const getRankBadge = (rank: number) => {
     switch (rank) {
@@ -141,14 +158,24 @@ export const TopContributorsSection: React.FC<TopContributorsSectionProps> = ({
             <Trophy className="w-4 h-4 text-amber-600 fill-amber-500" />
           </div>
           <div>
-            <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+            <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider flex flex-wrap items-center gap-2">
               <span>{title}</span>
-              <span className="text-[10px] font-extrabold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full border border-amber-200">
-                Top 3
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full border border-indigo-200">
+                <Calendar className="w-3 h-3 text-indigo-500" />
+                {activeMonthLabel}
+              </span>
+              <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-amber-50 text-amber-800 px-2 py-0.5 rounded-full border border-amber-200">
+                <Pin className="w-2.5 h-2.5 text-amber-600" />
+                Pinned for Month
               </span>
             </h2>
-            <p className="text-xs text-slate-500 mt-0.5">
-              {subtitle}
+            <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-2">
+              <span>{subtitle}</span>
+              {evaluationDate && (
+                <span className="hidden sm:inline-flex items-center gap-1 text-slate-400">
+                  • <Clock className="w-3 h-3" /> Evaluated {evaluationDate}
+                </span>
+              )}
             </p>
           </div>
         </div>
@@ -191,7 +218,7 @@ export const TopContributorsSection: React.FC<TopContributorsSectionProps> = ({
       {/* Error State */}
       {!isLoading && error && (
         <div className="bg-rose-50 border border-rose-200 rounded-xl p-4 text-xs text-rose-700 flex items-center justify-between">
-          <span>Failed to load contributor activity: {error}</span>
+          <span>Failed to load monthly contributor activity: {error}</span>
           <button
             onClick={fetchContributors}
             className="font-semibold underline hover:text-rose-900"
@@ -205,15 +232,15 @@ export const TopContributorsSection: React.FC<TopContributorsSectionProps> = ({
       {!isLoading && !error && (contributors.length === 0 || contributors.every(c => c.totalContributions === 0)) && (
         <div className="bg-white border border-slate-200 rounded-xl p-6 text-center shadow-2xs">
           <Award className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-          <p className="text-sm font-semibold text-slate-700">No contributor activity recorded yet</p>
+          <p className="text-sm font-semibold text-slate-700">No contributor activity recorded for {activeMonthLabel}</p>
           <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
-            Upload documents, create knowledge articles, or publish blogs to see rankings appear here.
+            Upload documents, write articles, or publish blogs during this month to be ranked in next evaluation.
           </p>
         </div>
       )}
 
       {/* Top 3 Contributor Cards */}
-      {!isLoading && !error && contributors.length > 0 && contributors.some(c => c.totalContributions > 0) && (
+      {!isLoading && !error && contributors.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {contributors.map((c) => {
             const isLeader = c.rank === 1;
@@ -281,7 +308,7 @@ export const TopContributorsSection: React.FC<TopContributorsSectionProps> = ({
                 {/* Contribution Breakdown Grid */}
                 <div className="pt-3 border-t border-slate-200/80">
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
-                    Contribution Breakdown
+                    Monthly Performance Breakdown
                   </p>
                   <div className="grid grid-cols-3 gap-1.5">
                     {/* Documents */}

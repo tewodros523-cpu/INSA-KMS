@@ -731,8 +731,10 @@ export const kmsApi = {
 
   // Analytics
   analytics: {
-    getTopContributors: (limit = 3) =>
-      fetchApi<Array<{
+    getTopContributors: (yearMonth?: string, limit = 3) => {
+      const params = new URLSearchParams({ limit: String(limit) });
+      if (yearMonth) params.set('yearMonth', yearMonth);
+      return fetchApi<Array<{
         rank: number;
         employeeId: string;
         name: string;
@@ -745,7 +747,16 @@ export const kmsApi = {
         blogs: number;
         articles: number;
         totalContributions: number;
-      }>>(`/analytics/top-contributors?limit=${limit}`),
+        yearMonth?: string;
+        monthLabel?: string;
+        evaluatedAt?: string;
+      }>>(`/analytics/top-contributors?${params.toString()}`);
+    },
+    evaluateMonthly: (yearMonth?: string, limit = 3) => {
+      const params = new URLSearchParams({ limit: String(limit) });
+      if (yearMonth) params.set('yearMonth', yearMonth);
+      return fetchApi<any>(`/analytics/top-contributors/evaluate?${params.toString()}`, { method: 'POST' });
+    },
   },
 };
 

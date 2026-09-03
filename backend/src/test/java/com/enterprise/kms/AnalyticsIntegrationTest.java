@@ -2,6 +2,10 @@ package com.enterprise.kms;
 
 import com.enterprise.kms.controller.AnalyticsController;
 import com.enterprise.kms.dto.TopContributorDto;
+import com.enterprise.kms.entity.Department;
+import com.enterprise.kms.entity.MonthlyTopContributor;
+import com.enterprise.kms.entity.User;
+import com.enterprise.kms.repository.MonthlyTopContributorRepository;
 import com.enterprise.kms.repository.UserRepository;
 import com.enterprise.kms.service.AnalyticsService;
 import org.junit.jupiter.api.BeforeEach;
@@ -11,48 +15,60 @@ import org.mockito.Mockito;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 class AnalyticsIntegrationTest {
 
     private UserRepository userRepository;
+    private MonthlyTopContributorRepository monthlyRepository;
     private AnalyticsService analyticsService;
     private AnalyticsController analyticsController;
 
     @BeforeEach
     void setUp() {
         userRepository = Mockito.mock(UserRepository.class);
-        analyticsService = new AnalyticsService(userRepository);
+        monthlyRepository = Mockito.mock(MonthlyTopContributorRepository.class);
+        analyticsService = new AnalyticsService(userRepository, monthlyRepository);
         analyticsController = new AnalyticsController(analyticsService);
     }
 
     @Test
-    @DisplayName("1. Top Contributors - Correctly maps ranking and calculates scores")
-    void testTopContributors_CalculationAndRanking() {
+    @DisplayName("1. Monthly Top Contributors - Returns existing pinned monthly snapshot")
+    void testMonthlyTopContributors_ReturnsExistingSnapshot() {
         UUID u1 = UUID.randomUUID();
-        UUID u2 = UUID.randomUUID();
-        UUID u3 = UUID.randomUUID();
+        User user1 = new User();
+        user1.setId(u1);
+        user1.setUsername("emp_a");
+        user1.setFullName("Employee A");
+        Department dept = new Department();
+        dept.setName("Finance");
+        user1.setDepartment(dept);
 
-        List<Object[]> mockRows = new ArrayList<>();
-        // Employee A: 10 docs + 5 blogs + 3 articles = 18
-        mockRows.add(new Object[]{u1, "Employee A", "emp_a", "emp_a@kms.internal", "Finance", "Analyst", 10L, 5L, 3L, 18L});
-        // Employee B: 7 docs + 8 blogs + 1 article = 16
-        mockRows.add(new Object[]{u2, "Employee B", "emp_b", "emp_b@kms.internal", "IT Security", "Engineer", 7L, 8L, 1L, 16L});
-        // Employee C: 5 docs + 4 blogs + 6 articles = 15
-        mockRows.add(new Object[]{u3, "Employee C", "emp_c", "emp_c@kms.internal", "HR", "Specialist", 5L, 4L, 6L, 15L});
+        MonthlyTopContributor snapshot = new MonthlyTopContributor(
+                "2026-09",
+                1,
+                user1,
+                10L,
+                5L,
+                3L,
+                18L,
+                OffsetDateTime.now()
+        );
 
-        when(userRepository.findTopContributorsNative(3)).thenReturn(mockRows);
+        when(monthlyRepository.findByYearMonthOrderByRankAsc("2026-09")).thenReturn(List.of(snapshot));
 
-        List<TopContributorDto> result = analyticsService.getTopContributors(3);
+        List<TopContributorDto> result = analyticsService.getMonthlyTopContributors("2026-09", 3);
         assertNotNull(result);
-        assertEquals(3, result.size());
+        assertEquals(1, result.size());
 
-        // Verify Rank 1
         TopContributorDto top1 = result.get(0);
         assertEquals(1, top1.getRank());
         assertEquals("Employee A", top1.getName());
@@ -60,50 +76,54 @@ class AnalyticsIntegrationTest {
         assertEquals(5L, top1.getBlogs());
         assertEquals(3L, top1.getArticles());
         assertEquals(18L, top1.getTotalContributions());
-        assertEquals("Finance", top1.getDepartment());
+        assertEquals("2026-09", top1.getYearMonth());
+        assertEquals("September 2026", top1.getMonthLabel());
 
-        // Verify Rank 2
-        TopContributorDto top2 = result.get(1);
-        assertEquals(2, top2.getRank());
-        assertEquals("Employee B", top2.getName());
-        assertEquals(7L, top2.getDocuments());
-        assertEquals(8L, top2.getBlogs());
-        assertEquals(1L, top2.getArticles());
-        assertEquals(16L, top2.getTotalContributions());
-
-        // Verify Rank 3
-        TopContributorDto top3 = result.get(2);
-        assertEquals(3, top3.getRank());
-        assertEquals("Employee C", top3.getName());
-        assertEquals(5L, top3.getDocuments());
-        assertEquals(4L, top3.getBlogs());
-        assertEquals(6L, top3.getArticles());
-        assertEquals(15L, top3.getTotalContributions());
+        // Verify no new evaluation was triggered
+        verify(userRepository, never()).findMonthlyTopContributorsNative(any(), any(), anyInt());
     }
 
     @Test
-    @DisplayName("2. Top Contributors - Controller endpoint returns 200 OK")
-    void testTopContributors_ControllerEndpoint() {
-        when(userRepository.findTopContributorsNative(3)).thenReturn(List.of());
-
-        ResponseEntity<List<TopContributorDto>> response = analyticsController.getTopContributors(3);
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertNotNull(response.getBody());
-        assertTrue(response.getBody().isEmpty());
-    }
-
-    @Test
-    @DisplayName("3. Top Contributors - Handles employees with zero contributions")
-    void testTopContributors_HandlesZeroContributions() {
+    @DisplayName("2. Monthly Top Contributors - Evaluates and saves snapshot if none exists")
+    void testMonthlyTopContributors_EvaluatesAndPinsSnapshot() {
         UUID u1 = UUID.randomUUID();
+        User user1 = new User();
+        user1.setId(u1);
+        user1.setUsername("emp_a");
+        user1.setFullName("Employee A");
+
+        when(monthlyRepository.findByYearMonthOrderByRankAsc("2026-09")).thenReturn(List.of());
+        when(userRepository.findById(u1)).thenReturn(Optional.of(user1));
+
         List<Object[]> mockRows = new ArrayList<>();
-        mockRows.add(new Object[]{u1, "Inactive User", "user_zero", "zero@kms.internal", "Unassigned", "", 0L, 0L, 0L, 0L});
+        mockRows.add(new Object[]{u1, "Employee A", "emp_a", "emp_a@kms.internal", "Finance", "Analyst", 7L, 2L, 1L, 10L});
+        when(userRepository.findMonthlyTopContributorsNative(any(), any(), eq(3))).thenReturn(mockRows);
 
-        when(userRepository.findTopContributorsNative(3)).thenReturn(mockRows);
+        when(monthlyRepository.save(any(MonthlyTopContributor.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        List<TopContributorDto> result = analyticsService.getTopContributors(3);
+        List<TopContributorDto> result = analyticsService.getMonthlyTopContributors("2026-09", 3);
+        assertNotNull(result);
         assertEquals(1, result.size());
-        assertEquals(0L, result.get(0).getTotalContributions());
-        assertEquals(1, result.get(0).getRank());
+
+        TopContributorDto top1 = result.get(0);
+        assertEquals(1, top1.getRank());
+        assertEquals("Employee A", top1.getName());
+        assertEquals(10L, top1.getTotalContributions());
+
+        // Verify snapshot was persisted
+        verify(monthlyRepository, atLeastOnce()).save(any(MonthlyTopContributor.class));
+    }
+
+    @Test
+    @DisplayName("3. Monthly Top Contributors - Controller endpoints return 200 OK")
+    void testMonthlyTopContributors_ControllerEndpoints() {
+        when(monthlyRepository.findByYearMonthOrderByRankAsc("2026-09")).thenReturn(List.of());
+        when(userRepository.findMonthlyTopContributorsNative(any(), any(), eq(3))).thenReturn(List.of());
+
+        ResponseEntity<List<TopContributorDto>> getResp = analyticsController.getTopContributors("2026-09", 3);
+        assertEquals(HttpStatus.OK, getResp.getStatusCode());
+
+        ResponseEntity<List<TopContributorDto>> postResp = analyticsController.evaluateMonthly("2026-09", 3);
+        assertEquals(HttpStatus.OK, postResp.getStatusCode());
     }
 }

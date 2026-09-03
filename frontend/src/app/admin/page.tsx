@@ -156,11 +156,11 @@ export default function AdminDashboardPage() {
           </>
         )}
 
-        {/* 3 Recent Blogs Section */}
-        <RecentBlogsSection limit={3} />
-
         {/* Top 3 Active Contributors Section */}
         <TopContributorsSection limit={3} />
+
+        {/* 3 Recent Blogs Section */}
+        <RecentBlogsSection limit={3} />
 
         {/* Administration Navigation Quick Links */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

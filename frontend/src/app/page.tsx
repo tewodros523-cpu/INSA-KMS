@@ -359,11 +359,11 @@ export default function DashboardOverviewPage() {
           )}
         </div>
 
-        {/* 3 Recent Blogs — Visible in everyone's dashboard */}
-        <RecentBlogsSection limit={3} />
-
         {/* Top 3 Active Employees / Contributors — Visible in everyone's dashboard */}
         <TopContributorsSection limit={3} />
+
+        {/* 3 Recent Blogs — Visible in everyone's dashboard */}
+        <RecentBlogsSection limit={3} />
 
         {/* Contributor Dashboard */}
         {!isAdmin && (

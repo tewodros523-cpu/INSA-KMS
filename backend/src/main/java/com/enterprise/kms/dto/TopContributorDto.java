@@ -1,5 +1,6 @@
 package com.enterprise.kms.dto;
 
+import java.time.OffsetDateTime;
 import java.util.UUID;
 
 public class TopContributorDto {
@@ -15,6 +16,9 @@ public class TopContributorDto {
     private long blogs;
     private long articles;
     private long totalContributions;
+    private String yearMonth;
+    private String monthLabel;
+    private OffsetDateTime evaluatedAt;
 
     public TopContributorDto() {
     }
@@ -22,6 +26,14 @@ public class TopContributorDto {
     public TopContributorDto(int rank, UUID employeeId, String name, String username, String email,
                              String department, String jobTitle, String profileImage,
                              long documents, long blogs, long articles, long totalContributions) {
+        this(rank, employeeId, name, username, email, department, jobTitle, profileImage,
+             documents, blogs, articles, totalContributions, null, null, OffsetDateTime.now());
+    }
+
+    public TopContributorDto(int rank, UUID employeeId, String name, String username, String email,
+                             String department, String jobTitle, String profileImage,
+                             long documents, long blogs, long articles, long totalContributions,
+                             String yearMonth, String monthLabel, OffsetDateTime evaluatedAt) {
         this.rank = rank;
         this.employeeId = employeeId;
         this.name = name;
@@ -34,6 +46,9 @@ public class TopContributorDto {
         this.blogs = blogs;
         this.articles = articles;
         this.totalContributions = totalContributions;
+        this.yearMonth = yearMonth;
+        this.monthLabel = monthLabel;
+        this.evaluatedAt = evaluatedAt != null ? evaluatedAt : OffsetDateTime.now();
     }
 
     public int getRank() {
@@ -130,5 +145,29 @@ public class TopContributorDto {
 
     public void setTotalContributions(long totalContributions) {
         this.totalContributions = totalContributions;
+    }
+
+    public String getYearMonth() {
+        return yearMonth;
+    }
+
+    public void setYearMonth(String yearMonth) {
+        this.yearMonth = yearMonth;
+    }
+
+    public String getMonthLabel() {
+        return monthLabel;
+    }
+
+    public void setMonthLabel(String monthLabel) {
+        this.monthLabel = monthLabel;
+    }
+
+    public OffsetDateTime getEvaluatedAt() {
+        return evaluatedAt;
+    }
+
+    public void setEvaluatedAt(OffsetDateTime evaluatedAt) {
+        this.evaluatedAt = evaluatedAt;
     }
 }
