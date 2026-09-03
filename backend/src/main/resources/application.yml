@@ -79,3 +79,15 @@ kms:
     # working directory). Mount this to a durable volume in container deployments —
     # a container filesystem is wiped on redeploy while the metadata rows survive.
     location: ${KMS_STORAGE_LOCATION:kms-storage-data}
+
+  # ---------------------------------------------------------------------------
+  # Keycloak Admin Integration (KeycloakAdminService)
+  # Set KMS_KEYCLOAK_ENABLED=false to disable if Keycloak is not running
+  # ---------------------------------------------------------------------------
+  keycloak:
+    enabled: ${KMS_KEYCLOAK_ENABLED:true}
+    base-url: ${KEYCLOAK_URL:http://localhost:8080}
+    realm: ${KEYCLOAK_REALM:kms-realm}
+    admin-username: ${KEYCLOAK_ADMIN_USER:evadevstudio@gmail.com}
+    admin-password: ${KEYCLOAK_ADMIN_PASSWORD:eva@3949}
+    admin-client-id: admin-cli
