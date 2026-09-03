@@ -656,6 +656,15 @@ public class AdminController {
         return getSettings();
     }
 
+    @GetMapping("/settings/storage-config")
+    public ResponseEntity<Map<String, String>> getStorageConfig() {
+        return ResponseEntity.ok(Map.of(
+                "imageUrl", systemSettingService.getSettingValue("storage.url.image", "/images"),
+                "videoUrl", systemSettingService.getSettingValue("storage.url.video", "/videos"),
+                "documentUrl", systemSettingService.getSettingValue("storage.url.document", "/api/v1/documents")
+        ));
+    }
+
     // ================= Share Links Management (FR-20) =================
 
     @GetMapping("/share-links")

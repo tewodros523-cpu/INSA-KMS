@@ -9,7 +9,7 @@ import { Card } from '@/src/components/ui/Card';
 import { LoadingState } from '@/src/components/ui/States';
 import { Alert } from '@/src/components/ui/Alert';
 import { kmsApi } from '@/src/lib/api';
-import { Settings, Save, RotateCcw, Database, Mail } from 'lucide-react';
+import { Settings, Save, RotateCcw, Database, Mail, Image, Video, FileText, Link2, RotateCw } from 'lucide-react';
 
 interface SettingRow {
   settingKey: string;
@@ -20,6 +20,32 @@ interface SettingRow {
 
 const KEYCLOAK_KEYS = ['keycloak.server.url', 'keycloak.realm', 'keycloak.client.id'];
 const REPOSITORY_KEYS = ['upload.max-file-size-mb', 'retention.default-days', 'recycle-bin.retention-days'];
+const STORAGE_KEYS = ['storage.url.image', 'storage.url.video', 'storage.url.document'];
+
+const STORAGE_PRESETS = {
+  local: {
+    label: 'Local Defaults',
+    'storage.url.image': '/images',
+    'storage.url.video': '/videos',
+    'storage.url.document': '/api/v1/documents',
+  },
+  media_api: {
+    label: 'Backend Media API',
+    'storage.url.image': '/api/v1/documents/media',
+    'storage.url.video': '/api/v1/documents/media',
+    'storage.url.document': '/api/v1/documents',
+  },
+  cdn: {
+    label: 'CDN Storage',
+    'storage.url.image': 'https://cdn.enterprise.internal/images',
+    'storage.url.video': 'https://cdn.enterprise.internal/videos',
+    'storage.url.document': 'https://storage.enterprise.internal/documents',
+  },
+};
+
+function isAbsoluteUrl(val: string) {
+  return /^https?:\/\//i.test(val);
+}
 
 export default function AdminSystemSettingsPage() {
   const [settings, setSettings] = React.useState<SettingRow[]>([]);
@@ -53,6 +79,16 @@ export default function AdminSystemSettingsPage() {
 
   const isDirty = settings.some((s) => values[s.settingKey] !== s.settingValue);
 
+  const applyPreset = (preset: keyof typeof STORAGE_PRESETS) => {
+    const p = STORAGE_PRESETS[preset];
+    setValues((prev) => ({
+      ...prev,
+      'storage.url.image': p['storage.url.image'],
+      'storage.url.video': p['storage.url.video'],
+      'storage.url.document': p['storage.url.document'],
+    }));
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
@@ -63,6 +99,12 @@ export default function AdminSystemSettingsPage() {
       settings.forEach((s) => {
         if (values[s.settingKey] !== s.settingValue) {
           changed[s.settingKey] = values[s.settingKey];
+        }
+      });
+      // Also include storage keys that may not have a DB row yet but have been edited
+      STORAGE_KEYS.forEach((key) => {
+        if (!settings.find((s) => s.settingKey === key) && values[key] !== undefined) {
+          changed[key] = values[key];
         }
       });
       if (Object.keys(changed).length === 0) {
@@ -83,7 +125,7 @@ export default function AdminSystemSettingsPage() {
 
   const renderGroup = (keys: string[]) => {
     const rows = settings.filter((s) => keys.includes(s.settingKey));
-    const others = keys.length === 0 ? settings.filter((s) => ![...KEYCLOAK_KEYS, ...REPOSITORY_KEYS].includes(s.settingKey)) : rows;
+    const others = keys.length === 0 ? settings.filter((s) => ![...KEYCLOAK_KEYS, ...REPOSITORY_KEYS, ...STORAGE_KEYS].includes(s.settingKey)) : rows;
     return others.map((s) => (
       <Input
         key={s.settingKey}
@@ -95,7 +137,28 @@ export default function AdminSystemSettingsPage() {
     ));
   };
 
-  const uncategorised = settings.filter((s) => ![...KEYCLOAK_KEYS, ...REPOSITORY_KEYS].includes(s.settingKey));
+  const uncategorised = settings.filter((s) => ![...KEYCLOAK_KEYS, ...REPOSITORY_KEYS, ...STORAGE_KEYS].includes(s.settingKey));
+
+  const storageFields: { key: string; label: string; icon: React.ReactNode; placeholder: string }[] = [
+    {
+      key: 'storage.url.image',
+      label: 'Image Storage URL',
+      icon: <Image className="w-4 h-4 text-blue-500" />,
+      placeholder: '/images  or  https://cdn.enterprise.internal/images',
+    },
+    {
+      key: 'storage.url.video',
+      label: 'Video Storage URL',
+      icon: <Video className="w-4 h-4 text-violet-500" />,
+      placeholder: '/videos  or  https://cdn.enterprise.internal/videos',
+    },
+    {
+      key: 'storage.url.document',
+      label: 'Document Storage URL',
+      icon: <FileText className="w-4 h-4 text-emerald-500" />,
+      placeholder: '/api/v1/documents  or  https://storage.enterprise.internal/docs',
+    },
+  ];
 
   return (
     <AppShell requiredRole="ROLE_ADMIN">
@@ -145,6 +208,73 @@ export default function AdminSystemSettingsPage() {
 
             <Card title="Repository & File System Limits">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">{renderGroup(REPOSITORY_KEYS)}</div>
+            </Card>
+
+            {/* ── Storage & Media URL Configuration ───────────────────────── */}
+            <Card title="Storage &amp; Media URL Configuration">
+              <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+                Configure the base URL or server path used when storing and serving images, videos, and document files.
+                Use a relative path (e.g.&nbsp;<code className="font-mono">/images</code>) for local file storage, or an
+                absolute URL (e.g.&nbsp;<code className="font-mono">https://cdn.enterprise.internal/images</code>) for
+                cloud/CDN storage. Changes take effect for all new uploads immediately after saving.
+              </p>
+
+              {/* Preset buttons */}
+              <div className="flex flex-wrap gap-2 mb-5 p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                <span className="text-xs font-medium text-slate-500 self-center mr-1">Quick presets:</span>
+                {(Object.keys(STORAGE_PRESETS) as Array<keyof typeof STORAGE_PRESETS>).map((pk) => (
+                  <button
+                    key={pk}
+                    type="button"
+                    onClick={() => applyPreset(pk)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-slate-300 bg-white hover:bg-slate-100 hover:border-slate-400 text-slate-700 transition-colors"
+                  >
+                    <RotateCw className="w-3 h-3" />
+                    {STORAGE_PRESETS[pk].label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="space-y-4">
+                {storageFields.map(({ key, label, icon, placeholder }) => {
+                  const currentVal = values[key] ?? settings.find((s) => s.settingKey === key)?.settingValue ?? '';
+                  const isAbsolute = isAbsoluteUrl(currentVal);
+                  return (
+                    <div key={key} className="border border-slate-200 rounded-xl p-4 bg-white hover:border-slate-300 transition-colors">
+                      <div className="flex items-center gap-2 mb-2">
+                        {icon}
+                        <span className="text-sm font-semibold text-slate-800">{label}</span>
+                        <span
+                          className={`ml-auto inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                            isAbsolute
+                              ? 'bg-violet-100 text-violet-700 border border-violet-200'
+                              : 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                          }`}
+                        >
+                          <Link2 className="w-2.5 h-2.5" />
+                          {isAbsolute ? 'Absolute URL' : 'Relative Path'}
+                        </span>
+                      </div>
+                      <Input
+                        label=""
+                        value={currentVal}
+                        onChange={(e) => setValues((prev) => ({ ...prev, [key]: e.target.value }))}
+                        placeholder={placeholder}
+                        helperText={settings.find((s) => s.settingKey === key)?.description ?? undefined}
+                      />
+                      {/* Live sample preview */}
+                      <div className="mt-2 px-3 py-2 rounded-md bg-slate-50 border border-slate-100">
+                        <p className="text-[10px] font-medium text-slate-400 mb-0.5">Example resolved URL</p>
+                        <p className="text-[11px] font-mono text-slate-700 break-all">
+                          {currentVal
+                            ? `${currentVal.replace(/\/$/, '')}/example-file${key === 'storage.url.image' ? '.png' : key === 'storage.url.video' ? '.mp4' : '.pdf'}`
+                            : '— enter a URL above —'}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </Card>
 
             {uncategorised.length > 0 && (

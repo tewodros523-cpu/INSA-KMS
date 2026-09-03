@@ -41,14 +41,17 @@ public class StorageService {
     private final Path frontendPublicVideosPath;
     private final SecretKey encryptionKey;
     private final boolean encryptionEnabled;
+    private final SystemSettingService systemSettingService;
 
     public StorageService(StorageObjectRepository storageObjectRepository,
                           @Value("${kms.storage.location:kms-storage-data}") String configuredLocation,
                           @Value("${kms.encryption.enabled:false}") boolean encryptionEnabled,
-                          @Value("${kms.encryption.key:}") String encryptionKeyBase64) {
+                          @Value("${kms.encryption.key:}") String encryptionKeyBase64,
+                          @org.springframework.beans.factory.annotation.Autowired(required = false) SystemSettingService systemSettingService) {
         this.storageObjectRepository = storageObjectRepository;
         this.storageLocation = Paths.get(configuredLocation).toAbsolutePath().normalize();
         this.encryptionEnabled = encryptionEnabled;
+        this.systemSettingService = systemSettingService;
 
         Path frontendPublicRoot = Paths.get("..", "frontend", "public").toAbsolutePath().normalize();
         if (!Files.exists(frontendPublicRoot)) {
@@ -255,7 +258,12 @@ public class StorageService {
                 storeFile(file);
             } catch (Exception ignored) {}
 
-            String publicUrl = (isVideo ? "/videos/" : "/images/") + storedName;
+            String imageBase = systemSettingService != null ? systemSettingService.getImageStorageUrl() : "/images";
+            String videoBase = systemSettingService != null ? systemSettingService.getVideoStorageUrl() : "/videos";
+            if (!imageBase.endsWith("/")) imageBase += "/";
+            if (!videoBase.endsWith("/")) videoBase += "/";
+
+            String publicUrl = (isVideo ? videoBase : imageBase) + storedName;
 
             return Map.of(
                     "url", publicUrl,
