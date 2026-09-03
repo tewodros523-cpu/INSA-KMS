@@ -305,6 +305,12 @@ export default function DashboardOverviewPage() {
           </div>
         )}
 
+        {/* Top 3 Active Employees / Contributors — Visible in everyone's dashboard */}
+        <TopContributorsSection limit={3} />
+
+        {/* 3 Recent Blogs — Visible in everyone's dashboard */}
+        <RecentBlogsSection limit={3} />
+
         {/* Recent Documents */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
@@ -358,12 +364,6 @@ export default function DashboardOverviewPage() {
             />
           )}
         </div>
-
-        {/* Top 3 Active Employees / Contributors — Visible in everyone's dashboard */}
-        <TopContributorsSection limit={3} />
-
-        {/* 3 Recent Blogs — Visible in everyone's dashboard */}
-        <RecentBlogsSection limit={3} />
 
         {/* Contributor Dashboard */}
         {!isAdmin && (
