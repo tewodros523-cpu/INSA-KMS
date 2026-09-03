@@ -41,10 +41,17 @@ public class SearchService {
                     caller.userIdText(), caller.rolesCsv(), caller.groupsCsv(),
                     caller.departmentIdText(), caller.privilegedRead(), pageable);
         }
-        return documentRepository.rankedSearch(
-                normalizeQuery(query),
-                caller.userIdText(), caller.rolesCsv(), caller.groupsCsv(),
-                caller.departmentIdText(), caller.privilegedRead(), pageable);
+        try {
+            return documentRepository.rankedSearch(
+                    normalizeQuery(query),
+                    caller.userIdText(), caller.rolesCsv(), caller.groupsCsv(),
+                    caller.departmentIdText(), caller.privilegedRead(), pageable);
+        } catch (Exception e) {
+            return documentRepository.filteredSearch(
+                    query.trim(), null, null, null, null, null, null,
+                    caller.userIdText(), caller.rolesCsv(), caller.groupsCsv(),
+                    caller.departmentIdText(), caller.privilegedRead(), pageable);
+        }
     }
 
     private static java.util.UUID toUuid(String val) {

@@ -224,16 +224,16 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
 
     /** FR-14 improved ranking: combines ts_rank_cd with recency signal. */
     @Query(value = "SELECT d.* FROM documents d " +
-                   "JOIN document_versions dv ON d.current_version_id = dv.id " +
+                   "LEFT JOIN document_versions dv ON d.current_version_id = dv.id " +
                    "WHERE d.is_deleted = false AND d.status::text = 'PUBLISHED' AND " +
-                   "to_tsvector('english', coalesce(dv.extracted_text, '') || ' ' || dv.file_name || ' ' || d.title) @@ plainto_tsquery('english', :query) " +
+                   "to_tsvector('english', coalesce(dv.extracted_text, '') || ' ' || coalesce(dv.file_name, '') || ' ' || coalesce(d.title, '')) @@ plainto_tsquery('english', :query) " +
                    "AND " + ACL_PREDICATE + " " +
-                   "ORDER BY (ts_rank_cd(to_tsvector('english', coalesce(dv.extracted_text, '') || ' ' || dv.file_name || ' ' || d.title), plainto_tsquery('english', :query)) * 0.7 " +
+                   "ORDER BY (ts_rank_cd(to_tsvector('english', coalesce(dv.extracted_text, '') || ' ' || coalesce(dv.file_name, '') || ' ' || coalesce(d.title, '')), plainto_tsquery('english', :query)) * 0.7 " +
                    "+ (1.0 / (1.0 + extract(epoch from (NOW() - d.updated_at)) / 86400.0)) * 0.3) DESC",
            countQuery = "SELECT count(d.id) FROM documents d " +
-                   "JOIN document_versions dv ON d.current_version_id = dv.id " +
+                   "LEFT JOIN document_versions dv ON d.current_version_id = dv.id " +
                    "WHERE d.is_deleted = false AND d.status::text = 'PUBLISHED' AND " +
-                   "to_tsvector('english', coalesce(dv.extracted_text, '') || ' ' || dv.file_name || ' ' || d.title) @@ plainto_tsquery('english', :query) " +
+                   "to_tsvector('english', coalesce(dv.extracted_text, '') || ' ' || coalesce(dv.file_name, '') || ' ' || coalesce(d.title, '')) @@ plainto_tsquery('english', :query) " +
                    "AND " + ACL_PREDICATE,
            nativeQuery = true)
     Page<Document> rankedSearch(@Param("query") String query,

@@ -10,6 +10,7 @@ import { Card } from '@/src/components/ui/Card';
 import { LoadingState, EmptyState, ErrorState } from '@/src/components/ui/States';
 import { Search, Filter, Bookmark, Sparkles, FileText, ArrowUpDown, X } from 'lucide-react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { kmsApi } from '@/src/lib/api';
 
 interface SearchResult {
@@ -27,7 +28,8 @@ interface SearchResult {
   updatedAt?: string;
 }
 
-export default function AdvancedSearchPage() {
+function AdvancedSearchContent() {
+  const searchParams = useSearchParams();
   const [query, setQuery] = useState('');
   const [selectedClass, setSelectedClass] = useState('ALL');
   const [selectedDept, setSelectedDept] = useState('ALL');
@@ -57,8 +59,9 @@ export default function AdvancedSearchPage() {
       .catch(() => {});
   }, []);
 
-  const executeSearch = async () => {
-    if (!query.trim() && selectedDept === 'ALL' && selectedDocType === 'ALL' && selectedClass === 'ALL') return;
+  const executeSearch = async (overrideQuery?: string | unknown) => {
+    const q = typeof overrideQuery === 'string' ? overrideQuery : query;
+    if (!q.trim() && selectedDept === 'ALL' && selectedDocType === 'ALL' && selectedClass === 'ALL') return;
     setIsLoading(true);
     setError(null);
     setHasSearched(true);
@@ -69,7 +72,7 @@ export default function AdvancedSearchPage() {
         docTypeId: selectedDocType !== 'ALL' ? selectedDocType : undefined,
         confidentiality: selectedClass !== 'ALL' ? selectedClass : undefined,
       };
-      const data = await kmsApi.search.advanced(query.trim(), filters);
+      const data = await kmsApi.search.advanced(q.trim(), filters);
       const items = Array.isArray(data) ? data : (data as { content?: SearchResult[] }).content ?? [];
       setResults(items as SearchResult[]);
     } catch (err: unknown) {
@@ -80,6 +83,15 @@ export default function AdvancedSearchPage() {
       setIsLoading(false);
     }
   };
+
+  React.useEffect(() => {
+    const urlQ = searchParams?.get('q') || searchParams?.get('query');
+    if (urlQ && urlQ.trim()) {
+      const trimmed = urlQ.trim();
+      setQuery(trimmed);
+      executeSearch(trimmed);
+    }
+  }, [searchParams]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') executeSearch();
@@ -363,5 +375,13 @@ export default function AdvancedSearchPage() {
         )}
       </div>
     </AppShell>
+  );
+}
+
+export default function AdvancedSearchPage() {
+  return (
+    <React.Suspense fallback={<AppShell><LoadingState message="Loading search engine..." /></AppShell>}>
+      <AdvancedSearchContent />
+    </React.Suspense>
   );
 }

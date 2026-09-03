@@ -32,9 +32,15 @@ public class SearchController {
     @GetMapping("/quick")
     @PreAuthorize("hasAnyRole('ROLE_VIEWER', 'ROLE_CONTRIBUTOR', 'ROLE_CONTENT_OWNER', 'ROLE_ADMIN')")
     @AuditLog(action = "SEARCH_QUICK", resourceType = "SEARCH")
-    public ResponseEntity<Page<Map<String, Object>>> quickSearch(@RequestParam("q") String query, Pageable pageable) {
-        Page<Document> results = searchService.searchDocuments(query, pageable);
-        logSearchQuery(query, results);
+    public ResponseEntity<Page<Map<String, Object>>> quickSearch(
+            @RequestParam(value = "q", required = false) String query,
+            @RequestParam(value = "query", required = false) String queryAlt,
+            Pageable pageable) {
+        String effectiveQuery = (query != null && !query.isBlank()) ? query : queryAlt;
+        Page<Document> results = searchService.searchDocuments(effectiveQuery, pageable);
+        if (effectiveQuery != null && !effectiveQuery.isBlank()) {
+            logSearchQuery(effectiveQuery, results);
+        }
         return ResponseEntity.ok(results.map(documentService::toResponse));
     }
 
