@@ -6,6 +6,7 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   error?: string;
   helperText?: string;
+  containerClassName?: string;
 }
 
 export const Input: React.FC<InputProps> = ({
@@ -13,13 +14,14 @@ export const Input: React.FC<InputProps> = ({
   error,
   helperText,
   className,
+  containerClassName,
   id,
   ...props
 }) => {
   const inputId = id || (label ? label.toLowerCase().replace(/\s+/g, '-') : undefined);
 
   return (
-    <div className="space-y-1 w-full text-left">
+    <div className={twMerge('space-y-1 w-full text-left', containerClassName)}>
       {label && (
         <label htmlFor={inputId} className="block text-xs font-semibold text-kms-slate-700">
           {label} {props.required && <span className="text-red-600">*</span>}
@@ -46,6 +48,7 @@ interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
   label?: string;
   error?: string;
   options: { label: string; value: string }[];
+  containerClassName?: string;
 }
 
 export const Select: React.FC<SelectProps> = ({
@@ -53,13 +56,14 @@ export const Select: React.FC<SelectProps> = ({
   error,
   options,
   className,
+  containerClassName,
   id,
   ...props
 }) => {
   const selectId = id || (label ? label.toLowerCase().replace(/\s+/g, '-') : undefined);
 
   return (
-    <div className="space-y-1 w-full text-left">
+    <div className={twMerge('space-y-1 w-full text-left', containerClassName)}>
       {label && (
         <label htmlFor={selectId} className="block text-xs font-semibold text-kms-slate-700">
           {label} {props.required && <span className="text-red-600">*</span>}

@@ -353,15 +353,15 @@ export default function DocumentLibraryPage() {
         )}
 
         {/* Filter & View Mode Toolbar */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-white p-3 border border-kms-slate-200 rounded-lg shadow-xs">
-          <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
-            <div className="flex items-center gap-1.5 text-xs text-kms-slate-600 font-semibold">
-              <Filter className="w-3.5 h-3.5 text-kms-slate-400" />
+        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 bg-white p-3 border border-kms-slate-200 rounded-xl shadow-2xs">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
+            <div className="flex items-center gap-1.5 text-xs text-kms-slate-700 font-semibold shrink-0 mr-1">
+              <Filter className="w-3.5 h-3.5 text-blue-600" />
               <span>Filters:</span>
             </div>
 
             {/* Quick Search */}
-            <div className="relative w-full sm:w-44 md:w-52">
+            <div className="relative w-full sm:w-48 lg:w-52 shrink-0">
               <Search className="w-3.5 h-3.5 text-kms-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type="text"
@@ -393,6 +393,7 @@ export default function DocumentLibraryPage() {
 
             {/* Department Filter */}
             <Select
+              containerClassName="w-auto shrink-0"
               options={[
                 { label: 'All Departments', value: 'ALL' },
                 ...departmentsList.map((d) => ({ label: `${d.name} (${d.code})`, value: d.id })),
@@ -402,11 +403,12 @@ export default function DocumentLibraryPage() {
                 setSelectedDept(e.target.value);
                 setCurrentPage(0);
               }}
-              className="w-full sm:w-40 md:w-44"
+              className="w-40 sm:w-44 text-xs"
             />
 
             {/* Document Category Filter */}
             <Select
+              containerClassName="w-auto shrink-0"
               options={[
                 { label: 'All Categories / Types', value: 'ALL' },
                 ...docTypesList.map((t) => ({ label: t.name, value: t.id })),
@@ -416,11 +418,12 @@ export default function DocumentLibraryPage() {
                 setSelectedDocType(e.target.value);
                 setCurrentPage(0);
               }}
-              className="w-full sm:w-40 md:w-44"
+              className="w-40 sm:w-44 text-xs"
             />
 
             {/* Status Filter */}
             <Select
+              containerClassName="w-auto shrink-0"
               options={[
                 { label: 'All Statuses', value: 'ALL' },
                 { label: 'PUBLISHED', value: 'PUBLISHED' },
@@ -433,11 +436,12 @@ export default function DocumentLibraryPage() {
                 setSelectedStatus(e.target.value);
                 setCurrentPage(0);
               }}
-              className="w-full sm:w-36 md:w-40"
+              className="w-32 sm:w-36 text-xs"
             />
 
             {/* Classification Filter */}
             <Select
+              containerClassName="w-auto shrink-0"
               options={[
                 { label: 'All Classifications', value: 'ALL' },
                 { label: 'PUBLIC', value: 'PUBLIC' },
@@ -450,26 +454,26 @@ export default function DocumentLibraryPage() {
                 setFilterClass(e.target.value);
                 setCurrentPage(0);
               }}
-              className="w-full sm:w-36 md:w-40"
+              className="w-32 sm:w-36 text-xs"
             />
 
             {(selectedDept !== 'ALL' || selectedDocType !== 'ALL' || filterClass !== 'ALL' || selectedStatus !== 'ALL' || searchQuery) && (
               <button
                 onClick={handleResetFilters}
-                className="text-xs text-blue-700 hover:text-blue-900 font-medium underline px-1"
+                className="text-xs text-blue-700 hover:text-blue-900 font-medium underline px-1 py-1 whitespace-nowrap shrink-0"
               >
                 Clear Filters
               </button>
             )}
           </div>
 
-          <div className="flex items-center gap-4">
-            <div className="text-xs text-kms-slate-500 font-medium">
+          <div className="flex items-center gap-3 shrink-0 self-end xl:self-center">
+            <div className="text-xs text-kms-slate-500 font-medium whitespace-nowrap">
               Showing <span className="font-semibold text-kms-slate-800">{filteredDocs.length}</span>
               {totalItems > documents.length && ` of ${totalItems} total`} items
             </div>
 
-            <div className="flex items-center gap-1 bg-kms-slate-100 p-1 rounded-lg border border-kms-slate-200">
+            <div className="flex items-center gap-1 bg-kms-slate-100 p-1 rounded-lg border border-kms-slate-200 shrink-0">
               <button
                 onClick={() => setViewMode('grid')}
                 title="Grid Card View"
