@@ -99,6 +99,65 @@ class UserManagementIntegrationTest {
     }
 
     @Test
+    @DisplayName("User Management E2E - Create, View & Edit User With Department Assignment")
+    void testCreateAndEditUserWithDepartment() {
+        UUID userId = UUID.randomUUID();
+        UUID deptFinanceId = UUID.randomUUID();
+        UUID deptItId = UUID.randomUUID();
+
+        com.enterprise.kms.entity.Department deptFinance = new com.enterprise.kms.entity.Department();
+        deptFinance.setId(deptFinanceId);
+        deptFinance.setName("Finance Department");
+        deptFinance.setCode("FIN");
+
+        com.enterprise.kms.entity.Department deptIT = new com.enterprise.kms.entity.Department();
+        deptIT.setId(deptItId);
+        deptIT.setName("IT Security");
+        deptIT.setCode("ITSEC");
+
+        when(departmentRepository.findById(deptFinanceId)).thenReturn(Optional.of(deptFinance));
+        when(departmentRepository.findById(deptItId)).thenReturn(Optional.of(deptIT));
+
+        User user = new User();
+        user.setId(userId);
+        user.setUsername("dept.test");
+        user.setEmail("dept.test@enterprise.internal");
+        user.setRoleName("ROLE_VIEWER");
+        user.setDepartment(deptFinance);
+
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+
+        // 1. Create with Department = Finance
+        Map<String, String> createReq = Map.of(
+                "username", "dept.test",
+                "email", "dept.test@enterprise.internal",
+                "roleName", "ROLE_VIEWER",
+                "departmentId", deptFinanceId.toString()
+        );
+        ResponseEntity<User> createRes = adminController.createUser(createReq);
+        assertEquals(HttpStatus.CREATED, createRes.getStatusCode());
+        assertNotNull(createRes.getBody().getDepartment());
+        assertEquals("Finance Department", createRes.getBody().getDepartment().getName());
+
+        // 2. Edit Department: Finance -> IT Security
+        Map<String, String> editReq = Map.of(
+                "departmentId", deptItId.toString()
+        );
+        ResponseEntity<User> editRes = adminController.updateUser(userId, editReq);
+        assertEquals(HttpStatus.OK, editRes.getStatusCode());
+        assertNotNull(editRes.getBody().getDepartment());
+        assertEquals("IT Security", editRes.getBody().getDepartment().getName());
+
+        // 3. Clear Department
+        Map<String, String> clearReq = new HashMap<>();
+        clearReq.put("departmentId", "");
+        ResponseEntity<User> clearRes = adminController.updateUser(userId, clearReq);
+        assertEquals(HttpStatus.OK, clearRes.getStatusCode());
+        assertNull(clearRes.getBody().getDepartment());
+    }
+
+    @Test
     @DisplayName("User Management E2E - Activate, Deactivate & Role Change")
     void testActivateDeactivateAndRoleChange() {
         UUID userId = UUID.randomUUID();

@@ -31,7 +31,7 @@ interface UserItem {
   email: string;
   roleName?: string;
   isActive?: boolean;
-  department?: { name: string } | null;
+  department?: { id?: string; name: string; code?: string } | null;
   keycloakSub: string;
   createdAt: string;
 }
@@ -47,6 +47,7 @@ const AVAILABLE_ROLES = [
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<UserItem[]>([]);
+  const [departments, setDepartments] = useState<Array<{ id: string; name: string; code: string }>>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -64,6 +65,7 @@ export default function AdminUsersPage() {
   const [formUsername, setFormUsername] = useState('');
   const [formEmail, setFormEmail] = useState('');
   const [formRole, setFormRole] = useState('ROLE_VIEWER');
+  const [formDepartmentId, setFormDepartmentId] = useState('');
   const [formTempPassword, setFormTempPassword] = useState('');
   const [formResetPassword, setFormResetPassword] = useState('');
   const [formResetTemporary, setFormResetTemporary] = useState(false);
@@ -87,6 +89,11 @@ export default function AdminUsersPage() {
 
   useEffect(() => {
     fetchUsers();
+    kmsApi.departments.getActive().then((list) => {
+      setDepartments(list || []);
+    }).catch((err) => {
+      console.error('[AdminUsersPage] Error fetching active departments:', err);
+    });
   }, []);
 
   const showNotification = (type: 'success' | 'error', message: string) => {
@@ -106,6 +113,10 @@ export default function AdminUsersPage() {
       showNotification('error', 'Username and email are required');
       return;
     }
+    if (!formDepartmentId) {
+      showNotification('error', 'Department selection is required');
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -113,6 +124,7 @@ export default function AdminUsersPage() {
         username: formUsername,
         email: formEmail,
         roleName: formRole,
+        departmentId: formDepartmentId,
         temporaryPassword: formTempPassword || undefined,
       });
 
@@ -121,6 +133,7 @@ export default function AdminUsersPage() {
       setFormUsername('');
       setFormEmail('');
       setFormRole('ROLE_VIEWER');
+      setFormDepartmentId('');
       setFormTempPassword('');
       fetchUsers();
     } catch (err: unknown) {
@@ -142,6 +155,7 @@ export default function AdminUsersPage() {
         username: formUsername,
         email: formEmail,
         roleName: formRole,
+        departmentId: formDepartmentId,
       });
 
       showNotification('success', `User '${formUsername}' updated successfully`);
@@ -195,6 +209,7 @@ export default function AdminUsersPage() {
     setFormUsername(user.username);
     setFormEmail(user.email);
     setFormRole(user.roleName || 'ROLE_VIEWER');
+    setFormDepartmentId(user.department?.id || '');
     setIsEditOpen(true);
   };
 
@@ -258,6 +273,20 @@ export default function AdminUsersPage() {
       header: 'Role',
       accessor: (u: UserItem) => (
         <Badge label={u.roleName || 'ROLE_VIEWER'} variant="blue" />
+      ),
+    },
+    {
+      header: 'Department',
+      accessor: (u: UserItem) => (
+        <span className="text-xs text-kms-slate-700 font-medium">
+          {u.department ? (
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-kms-slate-100 text-kms-slate-800 border border-kms-slate-200">
+              {u.department.name}
+            </span>
+          ) : (
+            <span className="text-kms-slate-400 italic">No department</span>
+          )}
+        </span>
       ),
     },
     {
@@ -462,6 +491,23 @@ export default function AdminUsersPage() {
           </div>
 
           <div>
+            <label className="block text-xs font-semibold text-kms-slate-700 mb-1">Department *</label>
+            <select
+              value={formDepartmentId}
+              onChange={(e) => setFormDepartmentId(e.target.value)}
+              required
+              className="w-full px-3 py-1.5 text-xs border border-kms-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+            >
+              <option value="">Select a department...</option>
+              {departments.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name} ({d.code})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
             <label className="block text-xs font-semibold text-kms-slate-700 mb-1">Temporary Password</label>
             <input
               type="text"
@@ -520,6 +566,12 @@ export default function AdminUsersPage() {
                 <Badge label={selectedUser.roleName || 'ROLE_VIEWER'} variant="blue" />
               </div>
               <div>
+                <span className="font-semibold text-kms-slate-500 block">Department</span>
+                <span className="font-semibold text-kms-slate-800">
+                  {selectedUser.department ? selectedUser.department.name : 'None'}
+                </span>
+              </div>
+              <div>
                 <span className="font-semibold text-kms-slate-500 block">Keycloak Subject</span>
                 <span className="font-mono text-kms-slate-700 text-[11px]">{selectedUser.keycloakSub}</span>
               </div>
@@ -573,6 +625,22 @@ export default function AdminUsersPage() {
               {AVAILABLE_ROLES.map((r) => (
                 <option key={r.value} value={r.value}>
                   {r.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-kms-slate-700 mb-1">Department</label>
+            <select
+              value={formDepartmentId}
+              onChange={(e) => setFormDepartmentId(e.target.value)}
+              className="w-full px-3 py-1.5 text-xs border border-kms-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+            >
+              <option value="">Select a department...</option>
+              {departments.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name} ({d.code})
                 </option>
               ))}
             </select>

@@ -38,6 +38,8 @@ import java.util.UUID;
 @RequestMapping("/api/v1/admin")
 public class AdminController {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AdminController.class);
+
     private final UserRepository userRepository;
     private final DocumentRepository documentRepository;
     private final DepartmentRepository departmentRepository;
@@ -233,18 +235,39 @@ public class AdminController {
         }
         if (body.containsKey("email") && !body.get("email").isBlank()) {
             u.setEmail(body.get("email"));
-            keycloakAdminService.updateProfile(
-                    keycloakAdminService.resolveUserId(u.getKeycloakSub(), u.getUsername()), body.get("email"));
+            if (keycloakAdminService != null) {
+                try {
+                    String kcId = keycloakAdminService.resolveUserId(u.getKeycloakSub(), u.getUsername());
+                    if (kcId != null) {
+                        keycloakAdminService.updateProfile(kcId, body.get("email"));
+                    }
+                } catch (Exception e) {
+                    log.warn("Could not sync email to Keycloak for user {}: {}", u.getUsername(), e.getMessage());
+                }
+            }
         }
         if (body.containsKey("roleName") && !body.get("roleName").isBlank()) {
             u.setRoleName(body.get("roleName"));
-            keycloakAdminService.assignRealmRoles(
-                    keycloakAdminService.resolveUserId(u.getKeycloakSub(), u.getUsername()), body.get("roleName"));
+            if (keycloakAdminService != null) {
+                try {
+                    String kcId = keycloakAdminService.resolveUserId(u.getKeycloakSub(), u.getUsername());
+                    if (kcId != null) {
+                        keycloakAdminService.assignRealmRoles(kcId, body.get("roleName"));
+                    }
+                } catch (Exception e) {
+                    log.warn("Could not sync role to Keycloak for user {}: {}", u.getUsername(), e.getMessage());
+                }
+            }
         }
-        if (body.containsKey("departmentId") && !body.get("departmentId").isBlank()) {
-            Department dept = departmentRepository.findById(UUID.fromString(body.get("departmentId")))
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Department not found"));
-            u.setDepartment(dept);
+        if (body.containsKey("departmentId")) {
+            String deptId = body.get("departmentId");
+            if (deptId == null || deptId.isBlank()) {
+                u.setDepartment(null);
+            } else {
+                Department dept = departmentRepository.findById(UUID.fromString(deptId.trim()))
+                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Department not found"));
+                u.setDepartment(dept);
+            }
         }
 
         User saved = userRepository.save(u);
