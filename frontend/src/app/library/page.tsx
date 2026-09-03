@@ -29,7 +29,16 @@ import {
   HardDrive,
   Search,
   X,
-  ChevronDown
+  ChevronDown,
+  ArrowRight,
+  FileSpreadsheet,
+  FileCode,
+  FileImage,
+  FileArchive,
+  Presentation,
+  Clock,
+  Sparkles,
+  Lock
 } from 'lucide-react';
 import Link from 'next/link';
 import { kmsApi } from '@/src/lib/api';
@@ -42,19 +51,33 @@ interface ApiDocument {
   department?: string;
   ownerDepartment?: { name?: string; code?: string };
   owner?: string;
+  author?: { fullName?: string; username?: string; email?: string } | string;
+  status?: string;
   confidentialityLevel?: 'PUBLIC' | 'INTERNAL' | 'CONFIDENTIAL' | 'RESTRICTED';
   securityClassification?: 'PUBLIC' | 'INTERNAL' | 'CONFIDENTIAL' | 'RESTRICTED';
   currentVersion?: string | {
     versionNumber?: number;
     fileName?: string;
+    mimeType?: string;
+    changeSummary?: string;
+    extractedText?: string;
     storageObject?: {
       fileSizeBytes?: number;
       checksumSha256?: string;
+      contentType?: string;
     };
   };
   fileSizeBytes?: number;
+  mimeType?: string;
   updatedAt?: string;
   isCheckedOut?: boolean;
+  checkedOutBy?: string;
+  description?: string;
+  summary?: string;
+  articleContent?: string;
+  extractedText?: string;
+  knowledgeType?: string;
+  isArticle?: boolean;
 }
 
 function getDocDepartment(doc: ApiDocument): string {
@@ -84,6 +107,150 @@ function formatFileSize(bytes?: number): string {
   const mb = bytes / (1024 * 1024);
   if (mb < 1) return `${(bytes / 1024).toFixed(0)} KB`;
   return `${mb.toFixed(1)} MB`;
+}
+
+function getDocFileName(doc: ApiDocument): string {
+  if (typeof doc.currentVersion === 'object' && doc.currentVersion?.fileName) {
+    return doc.currentVersion.fileName;
+  }
+  return doc.fileName || doc.title || '';
+}
+
+function getDocMimeType(doc: ApiDocument): string {
+  if (typeof doc.currentVersion === 'object' && (doc.currentVersion as any)?.mimeType) {
+    return (doc.currentVersion as any).mimeType;
+  }
+  return (doc as any).mimeType || '';
+}
+
+function getDocSummary(doc: ApiDocument): string | null {
+  if (doc.description) return doc.description;
+  if (typeof doc.currentVersion === 'object' && (doc.currentVersion as any)?.changeSummary) {
+    return (doc.currentVersion as any).changeSummary;
+  }
+  return null;
+}
+
+interface FileTypeDesign {
+  ext: string;
+  label: string;
+  badgeBg: string;
+  headerBg: string;
+  accentDot: string;
+  accentGradient: string;
+  icon: React.ComponentType<{ className?: string }>;
+}
+
+function getFileTypeDesign(doc: ApiDocument, isArticle: boolean): FileTypeDesign {
+  if (isArticle) {
+    return {
+      ext: doc.knowledgeType || 'ARTICLE',
+      label: 'Knowledge Article',
+      badgeBg: 'bg-emerald-500/15 text-emerald-800 border-emerald-300/80',
+      headerBg: 'from-emerald-500/20 via-teal-500/10 to-transparent',
+      accentDot: 'bg-emerald-500',
+      accentGradient: 'bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-800',
+      icon: BookOpen,
+    };
+  }
+
+  const fileName = getDocFileName(doc);
+  const ext = fileName.includes('.') ? fileName.split('.').pop()?.toLowerCase() || '' : '';
+  const mime = getDocMimeType(doc).toLowerCase();
+
+  if (ext === 'pdf' || mime.includes('pdf')) {
+    return {
+      ext: 'PDF',
+      label: 'PDF Document',
+      badgeBg: 'bg-rose-50 text-rose-700 border-rose-200',
+      headerBg: 'from-rose-500/20 via-red-500/10 to-transparent',
+      accentDot: 'bg-rose-500',
+      accentGradient: 'bg-gradient-to-r from-rose-600 via-red-600 to-rose-700 hover:from-rose-700 hover:to-red-800',
+      icon: FileText,
+    };
+  }
+
+  if (['doc', 'docx', 'odt', 'rtf'].includes(ext) || mime.includes('word')) {
+    return {
+      ext: 'DOCX',
+      label: 'Word Document',
+      badgeBg: 'bg-blue-50 text-blue-700 border-blue-200',
+      headerBg: 'from-blue-500/20 via-indigo-500/10 to-transparent',
+      accentDot: 'bg-blue-500',
+      accentGradient: 'bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-700 hover:to-indigo-800',
+      icon: FileText,
+    };
+  }
+
+  if (['xls', 'xlsx', 'csv', 'ods'].includes(ext) || mime.includes('excel') || mime.includes('spreadsheet')) {
+    return {
+      ext: 'XLSX',
+      label: 'Spreadsheet',
+      badgeBg: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+      headerBg: 'from-emerald-500/20 via-green-500/10 to-transparent',
+      accentDot: 'bg-emerald-500',
+      accentGradient: 'bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-800',
+      icon: FileSpreadsheet,
+    };
+  }
+
+  if (['ppt', 'pptx', 'odp'].includes(ext) || mime.includes('presentation')) {
+    return {
+      ext: 'PPTX',
+      label: 'Presentation',
+      badgeBg: 'bg-amber-50 text-amber-700 border-amber-200',
+      headerBg: 'from-amber-500/20 via-orange-500/10 to-transparent',
+      accentDot: 'bg-amber-500',
+      accentGradient: 'bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 hover:from-amber-700 hover:to-orange-800',
+      icon: Presentation,
+    };
+  }
+
+  if (['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp'].includes(ext) || mime.includes('image')) {
+    return {
+      ext: ext.toUpperCase() || 'IMAGE',
+      label: 'Image Asset',
+      badgeBg: 'bg-purple-50 text-purple-700 border-purple-200',
+      headerBg: 'from-purple-500/20 via-fuchsia-500/10 to-transparent',
+      accentDot: 'bg-purple-500',
+      accentGradient: 'bg-gradient-to-r from-purple-600 via-violet-600 to-purple-700 hover:from-purple-700 hover:to-violet-800',
+      icon: FileImage,
+    };
+  }
+
+  if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext) || mime.includes('zip') || mime.includes('compressed')) {
+    return {
+      ext: 'ZIP',
+      label: 'Archive',
+      badgeBg: 'bg-amber-50 text-amber-800 border-amber-300',
+      headerBg: 'from-yellow-500/20 via-amber-500/10 to-transparent',
+      accentDot: 'bg-amber-600',
+      accentGradient: 'bg-gradient-to-r from-amber-600 via-yellow-600 to-amber-700 hover:from-amber-700 hover:to-yellow-800',
+      icon: FileArchive,
+    };
+  }
+
+  if (['json', 'xml', 'sql', 'js', 'ts', 'java', 'py', 'html', 'css'].includes(ext)) {
+    return {
+      ext: ext.toUpperCase(),
+      label: 'Code File',
+      badgeBg: 'bg-cyan-50 text-cyan-700 border-cyan-200',
+      headerBg: 'from-cyan-500/20 via-sky-500/10 to-transparent',
+      accentDot: 'bg-cyan-500',
+      accentGradient: 'bg-gradient-to-r from-cyan-600 via-blue-600 to-cyan-700 hover:from-cyan-700 hover:to-blue-800',
+      icon: FileCode,
+    };
+  }
+
+  return {
+    ext: ext ? ext.toUpperCase() : 'DOC',
+    label: 'Document',
+    badgeBg: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+    headerBg: 'from-blue-500/20 via-indigo-500/10 to-transparent',
+    accentDot: 'bg-indigo-500',
+    accentGradient: 'bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-700 hover:to-indigo-800',
+    icon: FileText,
+  };
 }
 
 function extractArticleCoverImage(doc: any): string | null {
@@ -561,101 +728,190 @@ export default function DocumentLibraryPage() {
                           viewMode === 'grid' ? (
                             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5">
                               {docsInDept.map((doc: ApiDocument & { isArticle?: boolean; knowledgeType?: string }) => {
-                                const isArt = doc.isArticle || doc.fileName?.endsWith('.md') || doc.knowledgeType === 'SOP';
+                                const isArt = Boolean(doc.isArticle || doc.fileName?.endsWith('.md') || doc.knowledgeType === 'SOP');
                                 const coverImg = isArt ? extractArticleCoverImage(doc) : null;
                                 const targetUrl = isArt ? `/articles/${doc.id}` : `/preview/${doc.id}`;
                                 const cls = getDocClassification(doc);
                                 const dept = getDocDepartment(doc);
                                 const versionStr = getDocVersionString(doc);
                                 const sizeStr = formatFileSize(getDocSizeBytes(doc));
+                                const typeInfo = getFileTypeDesign(doc, isArt);
+                                const TypeIcon = typeInfo.icon;
+                                const fileName = getDocFileName(doc);
+                                const summary = getDocSummary(doc);
+                                const docTitle = doc.title || fileName || doc.id;
 
                                 return (
                                   <div
                                     key={doc.id}
-                                    className="bg-white/95 backdrop-blur-xs border border-kms-slate-200/90 hover:border-blue-500/70 rounded-2xl overflow-hidden shadow-2xs hover:shadow-xl transition-all duration-300 flex flex-col justify-between group hover:-translate-y-1"
+                                    className="bg-white rounded-2xl border border-kms-slate-200/90 hover:border-blue-400/80 shadow-2xs hover:shadow-xl transition-all duration-300 flex flex-col justify-between overflow-hidden group hover:-translate-y-1.5 ring-1 ring-black/5"
                                   >
                                     <div>
-                                      {/* Top Banner Header: Cover Image vs Color Accent Header */}
-                                      {coverImg ? (
-                                        <div className="relative h-48 w-full bg-kms-slate-950 overflow-hidden">
+                                      {/* Top Visual Canvas Header */}
+                                      {isArt && coverImg ? (
+                                        <div className="relative h-44 w-full bg-kms-slate-950 overflow-hidden select-none">
                                           <img
                                             src={coverImg}
-                                            alt={doc.title || 'Article Cover'}
-                                            className="w-full h-full object-cover group-hover:scale-108 transition-transform duration-700 opacity-90"
+                                            alt={docTitle}
+                                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 opacity-85"
                                             onError={(e) => {
                                               (e.currentTarget.parentElement as HTMLElement).style.display = 'none';
                                             }}
                                           />
-                                          <div className="absolute inset-0 bg-gradient-to-t from-kms-slate-950 via-kms-slate-900/50 to-black/30 p-4 flex flex-col justify-between">
+                                          <div className="absolute inset-0 bg-gradient-to-t from-kms-slate-950 via-kms-slate-950/40 to-black/30 p-3.5 flex flex-col justify-between">
                                             <div className="flex items-center justify-between gap-2">
-                                              <div className="flex items-center gap-1.5">
-                                                <Badge label={doc.knowledgeType || 'ARTICLE'} variant="blue" />
-                                                <Badge label={cls} classification={cls} />
-                                              </div>
-                                              {doc.isCheckedOut && <Badge label="CHECKED OUT" stateBadge="CHECKED_OUT" />}
+                                              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-[10px] font-bold uppercase tracking-wider bg-emerald-500/90 text-white backdrop-blur-md shadow-xs">
+                                                <BookOpen className="w-3 h-3" />
+                                                <span>{doc.knowledgeType || 'ARTICLE'}</span>
+                                              </span>
+                                              <Badge label={cls} classification={cls} />
                                             </div>
 
                                             <div className="space-y-1">
-                                              <div className="flex items-center gap-1.5 text-[10px] text-blue-200 font-semibold uppercase tracking-wider">
-                                                <BookOpen className="w-3 h-3 text-blue-300" />
-                                                <span>Knowledge Article</span>
+                                              <div className="flex items-center gap-1.5 text-[10px] text-emerald-200 font-bold uppercase tracking-widest">
+                                                <Sparkles className="w-3 h-3 text-emerald-300" />
+                                                <span>Knowledge Base</span>
                                               </div>
                                               <Link
                                                 href={targetUrl}
-                                                className="text-base font-extrabold text-white group-hover:text-blue-200 transition-colors line-clamp-2 leading-snug drop-shadow-md"
+                                                className="text-base font-extrabold text-white group-hover:text-emerald-200 transition-colors line-clamp-2 leading-snug drop-shadow-md"
                                               >
-                                                {doc.title || doc.fileName || doc.id}
+                                                {docTitle}
                                               </Link>
                                             </div>
                                           </div>
                                         </div>
-                                      ) : (
-                                        <div className="p-5 pb-3 space-y-3">
-                                          <div className="flex items-center justify-between gap-2">
-                                            <div className="flex items-center gap-1.5">
-                                              <Badge label={doc.knowledgeType || (isArt ? 'ARTICLE' : 'DOCUMENT')} variant={isArt ? 'blue' : 'slate'} />
-                                              <Badge label={cls} classification={cls} />
-                                            </div>
-                                            {doc.isCheckedOut && <Badge label="CHECKED OUT" stateBadge="CHECKED_OUT" />}
+                                      ) : isArt ? (
+                                        <div className="relative h-36 w-full overflow-hidden bg-gradient-to-br from-emerald-600 via-teal-700 to-cyan-800 p-3.5 flex flex-col justify-between select-none">
+                                          {/* Abstract aesthetic accents */}
+                                          <div className="absolute -right-6 -bottom-6 w-32 h-32 rounded-full bg-white/10 blur-xl pointer-events-none" />
+                                          <div className="absolute left-1/3 -top-6 w-24 h-24 rounded-full bg-emerald-400/20 blur-lg pointer-events-none" />
+
+                                          <div className="flex items-center justify-between gap-2 relative z-10">
+                                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-[10px] font-bold uppercase tracking-wider bg-white/20 text-white border border-white/30 backdrop-blur-md shadow-2xs">
+                                              <BookOpen className="w-3 h-3" />
+                                              <span>{doc.knowledgeType || 'ARTICLE'}</span>
+                                            </span>
+                                            <Badge label={cls} classification={cls} />
                                           </div>
 
-                                          <div className="flex items-start gap-3.5 pt-1">
-                                            <div className={`p-3 rounded-xl shrink-0 shadow-xs transition-transform group-hover:rotate-3 ${
-                                              isArt 
-                                                ? 'bg-gradient-to-br from-emerald-500 to-teal-700 text-white shadow-emerald-200/50' 
-                                                : 'bg-gradient-to-br from-blue-600 to-indigo-700 text-white shadow-blue-200/50'
-                                            }`}>
-                                              {isArt ? <BookOpen className="w-5 h-5" /> : <FileText className="w-5 h-5" />}
+                                          <div className="relative z-10 space-y-1">
+                                            <div className="flex items-center gap-1.5 text-[10px] text-emerald-200 font-bold uppercase tracking-widest">
+                                              <Sparkles className="w-3 h-3 text-emerald-300" />
+                                              <span>Knowledge Article</span>
+                                            </div>
+                                            <Link
+                                              href={targetUrl}
+                                              className="text-base font-extrabold text-white group-hover:text-emerald-100 transition-colors line-clamp-2 leading-snug drop-shadow-sm"
+                                            >
+                                              {docTitle}
+                                            </Link>
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        /* Document Modern Card Visual Header with Simulated Document Sheet Preview */
+                                        <div className={`relative h-36 w-full overflow-hidden bg-gradient-to-br ${typeInfo.headerBg} border-b border-kms-slate-200/70 p-3.5 flex flex-col justify-between select-none`}>
+                                          <div className="flex items-center justify-between gap-2 relative z-10">
+                                            <div className="flex items-center gap-1.5">
+                                              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-extrabold tracking-wide uppercase shadow-2xs ${typeInfo.badgeBg}`}>
+                                                <TypeIcon className="w-3.5 h-3.5 shrink-0" />
+                                                <span>{typeInfo.ext}</span>
+                                              </span>
+                                              <Badge label={cls} classification={cls} />
                                             </div>
 
-                                            <div className="flex-1 min-w-0">
-                                              <Link
-                                                href={targetUrl}
-                                                className="text-base font-extrabold text-kms-slate-900 group-hover:text-blue-700 transition-colors line-clamp-2 leading-snug"
-                                              >
-                                                {doc.title || doc.fileName || doc.id}
-                                              </Link>
+                                            <div className="flex items-center gap-1.5">
+                                              {doc.isCheckedOut && (
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200 shadow-2xs">
+                                                  <Lock className="w-2.5 h-2.5 text-amber-600" />
+                                                  <span>Locked</span>
+                                                </span>
+                                              )}
+                                              {doc.status === 'PUBLISHED' && (
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/80 shadow-2xs">
+                                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                                  <span>Published</span>
+                                                </span>
+                                              )}
+                                              {doc.status === 'UNDER_REVIEW' && (
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200/80 shadow-2xs">
+                                                  <Clock className="w-2.5 h-2.5 text-amber-600" />
+                                                  <span>Review</span>
+                                                </span>
+                                              )}
+                                              {doc.status === 'DRAFT' && (
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-200 shadow-2xs">
+                                                  <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                                                  <span>Draft</span>
+                                                </span>
+                                              )}
+                                            </div>
+                                          </div>
+
+                                          {/* Simulated Tactile Document Sheet Preview */}
+                                          <div className="absolute inset-x-0 bottom-0 flex justify-center pointer-events-none">
+                                            <div className="w-48 h-20 bg-white/95 backdrop-blur-xs rounded-t-xl shadow-md border-t border-x border-kms-slate-200/90 p-3 space-y-1.5 transform translate-y-3 group-hover:translate-y-1 group-hover:scale-102 transition-all duration-300">
+                                              <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-1.5">
+                                                  <div className={`w-2 h-2 rounded-full ${typeInfo.accentDot}`} />
+                                                  <div className="h-1.5 w-16 bg-kms-slate-300 rounded-full" />
+                                                </div>
+                                                <div className="h-1.5 w-7 bg-kms-slate-200 rounded-full" />
+                                              </div>
+                                              <div className="h-1.5 w-full bg-kms-slate-100 rounded-full" />
+                                              <div className="h-1.5 w-5/6 bg-kms-slate-100 rounded-full" />
+                                              <div className="h-1.5 w-3/4 bg-kms-slate-100 rounded-full" />
                                             </div>
                                           </div>
                                         </div>
                                       )}
 
                                       {/* Card Body Details */}
-                                      <div className="p-5 pt-2 space-y-3">
-                                        {/* Department & Meta Pill Bar */}
-                                        <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-kms-slate-600 pt-2 border-t border-kms-slate-100">
-                                          <div className="flex items-center gap-1.5 bg-kms-slate-50 px-2.5 py-1 rounded-md border border-kms-slate-200/70 font-medium">
+                                      <div className="p-4 space-y-3">
+                                        {/* Document Title (if not shown in article header) */}
+                                        {!isArt && (
+                                          <div className="space-y-1">
+                                            <Link
+                                              href={targetUrl}
+                                              className="text-sm font-extrabold text-kms-slate-900 group-hover:text-blue-700 transition-colors line-clamp-2 leading-snug tracking-tight"
+                                              title={docTitle}
+                                            >
+                                              {docTitle}
+                                            </Link>
+                                            {fileName && doc.title && fileName !== doc.title && (
+                                              <p className="text-[11px] font-mono text-kms-slate-400 truncate flex items-center gap-1">
+                                                <FileText className="w-3 h-3 text-kms-slate-400 shrink-0" />
+                                                <span className="truncate">{fileName}</span>
+                                              </p>
+                                            )}
+                                          </div>
+                                        )}
+
+                                        {/* Excerpt / Summary */}
+                                        {summary && (
+                                          <p className="text-xs text-kms-slate-600 line-clamp-2 leading-relaxed">
+                                            {summary}
+                                          </p>
+                                        )}
+
+                                        {/* Metadata Pill Bar */}
+                                        <div className="flex items-center justify-between gap-2 pt-2 border-t border-kms-slate-100 text-[11px] text-kms-slate-600">
+                                          <div className="flex items-center gap-1.5 bg-kms-slate-50 px-2.5 py-1 rounded-lg border border-kms-slate-200/70 font-medium">
                                             <Building2 className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                                            <span className="truncate max-w-[120px]">{dept}</span>
+                                            <span className="truncate max-w-[130px]">{dept}</span>
                                           </div>
 
-                                          <div className="flex items-center gap-1 font-mono text-[10px] font-bold bg-blue-50 text-blue-800 px-2 py-1 rounded-md border border-blue-200/60">
+                                          <Link
+                                            href={`/versions/${doc.id}`}
+                                            className="flex items-center gap-1 font-mono text-[10px] font-bold bg-blue-50 hover:bg-blue-100 text-blue-800 px-2 py-1 rounded-md border border-blue-200/60 transition-colors"
+                                            title="View Version History"
+                                          >
                                             <span>{versionStr}</span>
-                                          </div>
+                                          </Link>
                                         </div>
 
                                         {/* Additional Stats Strip */}
-                                        <div className="flex items-center justify-between text-[11px] text-kms-slate-500 font-medium px-0.5">
+                                        <div className="flex items-center justify-between text-[11px] text-kms-slate-400 font-medium px-0.5">
                                           <div className="flex items-center gap-1.5">
                                             <Calendar className="w-3.5 h-3.5 text-kms-slate-400 shrink-0" />
                                             <span>{new Date(doc.updatedAt || Date.now()).toLocaleDateString()}</span>
@@ -670,27 +926,32 @@ export default function DocumentLibraryPage() {
                                     </div>
 
                                     {/* Card Footer Actions */}
-                                    <div className="p-5 pt-0">
+                                    <div className="p-4 pt-0">
                                       <div className="flex items-center justify-between gap-2 pt-3 border-t border-kms-slate-100">
                                         <Link href={targetUrl} className="flex-1">
-                                          <button className={`w-full text-xs font-bold py-2.5 px-3 rounded-xl transition-all duration-200 flex items-center justify-center gap-2 shadow-xs group-hover:shadow-md ${
-                                            isArt
-                                              ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white'
-                                              : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white'
-                                          }`}>
-                                            {isArt ? <BookOpen className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                          <button
+                                            className={`w-full text-xs font-bold py-2.5 px-3.5 rounded-xl transition-all duration-200 flex items-center justify-center gap-2 shadow-2xs hover:shadow-md text-white ${typeInfo.accentGradient} group/btn`}
+                                          >
+                                            <TypeIcon className="w-4 h-4 shrink-0 transition-transform group-hover/btn:scale-110" />
                                             <span>{isArt ? 'Read Article' : 'Preview Document'}</span>
+                                            <ArrowRight className="w-3.5 h-3.5 shrink-0 opacity-70 group-hover/btn:translate-x-1 group-hover/btn:opacity-100 transition-all" />
                                           </button>
                                         </Link>
 
                                         <div className="flex items-center gap-1">
                                           <Link href={`/share/${doc.id}`}>
-                                            <button title="Share Document" className="p-2 text-kms-slate-500 hover:text-blue-700 hover:bg-blue-50 rounded-lg border border-kms-slate-200/80 transition-colors">
+                                            <button
+                                              title="Share Document"
+                                              className="p-2 text-kms-slate-500 hover:text-blue-700 hover:bg-blue-50 rounded-xl border border-kms-slate-200/80 transition-colors"
+                                            >
                                               <Share2 className="w-4 h-4" />
                                             </button>
                                           </Link>
                                           <Link href={`/versions/${doc.id}`}>
-                                            <button title="Version History" className="p-2 text-kms-slate-500 hover:text-purple-700 hover:bg-purple-50 rounded-lg border border-kms-slate-200/80 transition-colors">
+                                            <button
+                                              title="Version History"
+                                              className="p-2 text-kms-slate-500 hover:text-purple-700 hover:bg-purple-50 rounded-xl border border-kms-slate-200/80 transition-colors"
+                                            >
                                               <History className="w-4 h-4" />
                                             </button>
                                           </Link>
