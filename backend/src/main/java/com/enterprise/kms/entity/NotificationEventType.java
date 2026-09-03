@@ -56,4 +56,8 @@ public final class NotificationEventType {
     public static final String SEARCH_ALERT = "SEARCH_ALERT";
     public static final String SECURITY_EVENT = "SECURITY_EVENT";
     public static final String SYSTEM = "SYSTEM";
+
+    // Blog & Discussion events
+    public static final String BLOG_COMMENT_ADDED = "BLOG_COMMENT_ADDED";
+    public static final String BLOG_REPLY_ADDED = "BLOG_REPLY_ADDED";
 }

@@ -73,8 +73,20 @@ export const RichMarkdownRenderer: React.FC<RichMarkdownRendererProps> = ({ cont
   };
 
   const parseFormatting = (str: string): React.ReactNode => {
-    let result = str.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-    result = result.replace(/\*(.*?)\*/g, '<em>$1</em>');
+    let result = str;
+    // inline code `code`
+    result = result.replace(/`([^`]+)`/g, '<code class="bg-kms-slate-200 text-pink-700 font-mono text-[11px] px-1 py-0.5 rounded font-semibold">$1</code>');
+    // bold italic ***bold italic***
+    result = result.replace(/\*\*\*(.*?)\*\*\*/g, '<strong><em>$1</em></strong>');
+    // bold **bold** or __bold__
+    result = result.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    result = result.replace(/__(.*?)__/g, '<strong>$1</strong>');
+    // italic *italic* or _italic_
+    result = result.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+    result = result.replace(/_([^_]+)_/g, '<em>$1</em>');
+    // strikethrough ~~del~~
+    result = result.replace(/~~(.*?)~~/g, '<del class="line-through text-kms-slate-400">$1</del>');
+    // underline <u>...</u>
     result = result.replace(/<u>(.*?)<\/u>/g, '<u>$1</u>');
     return <span dangerouslySetInnerHTML={{ __html: result }} />;
   };
@@ -192,37 +204,118 @@ export const RichMarkdownRenderer: React.FC<RichMarkdownRendererProps> = ({ cont
       return;
     }
 
-    if (trimmed.startsWith('# ')) {
-      elements.push(<h1 key={idx} className="text-xl font-extrabold text-kms-slate-900 mt-4 mb-2 tracking-tight">{formatInline(trimmed.substring(2))}</h1>);
-    } else if (trimmed.startsWith('## ')) {
-      elements.push(<h2 key={idx} className="text-lg font-bold text-kms-slate-900 mt-3 mb-1.5 border-b border-kms-slate-200 pb-1">{formatInline(trimmed.substring(3))}</h2>);
-    } else if (trimmed.startsWith('### ')) {
-      elements.push(<h3 key={idx} className="text-sm font-bold text-kms-slate-900 mt-3 mb-1">{formatInline(trimmed.substring(4))}</h3>);
-    } else if (trimmed.startsWith('> ')) {
+    // Horizontal Rule: ---, ***, ___
+    if (/^(---|___|\*\*\*)$/.test(trimmed)) {
+      elements.push(<hr key={idx} className="my-4 border-t border-kms-slate-300" />);
+      return;
+    }
+
+    // Headings: supports #top, # top, ##top, ## top, etc. up to 6 #'s
+    const headingMatch = trimmed.match(/^(#{1,6})\s*(.*)$/);
+    if (headingMatch) {
+      const level = headingMatch[1].length;
+      const headingText = headingMatch[2].trim();
+      if (headingText.length > 0) {
+        switch (level) {
+          case 1:
+            elements.push(
+              <h1 key={idx} className="text-2xl font-extrabold text-kms-slate-900 mt-5 mb-2.5 tracking-tight border-b border-kms-slate-200 pb-1.5">
+                {formatInline(headingText)}
+              </h1>
+            );
+            return;
+          case 2:
+            elements.push(
+              <h2 key={idx} className="text-xl font-bold text-kms-slate-900 mt-4 mb-2 border-b border-kms-slate-100 pb-1">
+                {formatInline(headingText)}
+              </h2>
+            );
+            return;
+          case 3:
+            elements.push(
+              <h3 key={idx} className="text-base font-bold text-kms-slate-900 mt-3 mb-1.5">
+                {formatInline(headingText)}
+              </h3>
+            );
+            return;
+          case 4:
+            elements.push(
+              <h4 key={idx} className="text-sm font-semibold text-kms-slate-900 mt-2.5 mb-1">
+                {formatInline(headingText)}
+              </h4>
+            );
+            return;
+          case 5:
+            elements.push(
+              <h5 key={idx} className="text-xs font-bold uppercase tracking-wider text-kms-slate-700 mt-2 mb-1">
+                {formatInline(headingText)}
+              </h5>
+            );
+            return;
+          case 6:
+          default:
+            elements.push(
+              <h6 key={idx} className="text-xs font-semibold italic text-kms-slate-600 mt-2 mb-1">
+                {formatInline(headingText)}
+              </h6>
+            );
+            return;
+        }
+      }
+    }
+
+    // Blockquote: supports > quote or >quote
+    if (trimmed.startsWith('>')) {
+      const quoteText = trimmed.replace(/^>\s*/, '');
       elements.push(
         <blockquote key={idx} className="p-3 my-2 bg-blue-50 border-l-4 border-blue-600 text-blue-950 font-medium italic rounded-r text-xs">
-          {formatInline(trimmed.substring(2))}
+          {formatInline(quoteText)}
         </blockquote>
       );
-    } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+      return;
+    }
+
+    // Checkbox / Task list: - [ ] Task or - [x] Task
+    const taskMatch = trimmed.match(/^[-*+]\s+\[([ xX])\]\s+(.*)$/);
+    if (taskMatch) {
+      const isChecked = taskMatch[1].toLowerCase() === 'x';
+      elements.push(
+        <div key={idx} className={`flex items-center gap-2 text-xs my-1 font-sans ${isChecked ? 'line-through text-kms-slate-400' : 'text-kms-slate-800'}`}>
+          <input type="checkbox" checked={isChecked} readOnly className="rounded border-kms-slate-300 text-blue-600 focus:ring-0" />
+          <span>{formatInline(taskMatch[2])}</span>
+        </div>
+      );
+      return;
+    }
+
+    // Bullet list: - item, * item, + item, or -item, *item
+    const bulletMatch = trimmed.match(/^[-*+]\s*(.+)$/);
+    if (bulletMatch) {
       elements.push(
         <ul key={idx} className="list-disc list-inside space-y-1 text-xs text-kms-slate-800 my-1 font-sans">
-          <li>{formatInline(trimmed.substring(2))}</li>
+          <li>{formatInline(bulletMatch[1])}</li>
         </ul>
       );
-    } else if (/^\d+\.\s/.test(trimmed)) {
+      return;
+    }
+
+    // Numbered list: 1. item, 2. item, etc.
+    const numMatch = trimmed.match(/^(\d+)\.\s*(.+)$/);
+    if (numMatch) {
       elements.push(
         <ol key={idx} className="list-decimal list-inside space-y-1 text-xs text-kms-slate-800 my-1 font-sans">
-          <li>{formatInline(trimmed.replace(/^\d+\.\s/, ''))}</li>
+          <li>{formatInline(numMatch[2])}</li>
         </ol>
       );
-    } else {
-      elements.push(
-        <p key={idx} className="text-xs text-kms-slate-800 leading-relaxed font-sans my-1">
-          {formatInline(line)}
-        </p>
-      );
+      return;
     }
+
+    // Standard paragraph
+    elements.push(
+      <p key={idx} className="text-xs text-kms-slate-800 leading-relaxed font-sans my-1">
+        {formatInline(line)}
+      </p>
+    );
   });
 
   if (inCodeBlock) flushCodeBlock(`code-end`);

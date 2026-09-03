@@ -708,6 +708,78 @@ export const kmsApi = {
       const imageUrl = data.url || data.mediaUrl || '';
       return { mediaUrl: imageUrl, url: imageUrl };
     },
+
+    // Comments & Replies
+    getComments: (blogId: string) =>
+      fetchApi<Array<{
+        id: string;
+        content: string;
+        author: {
+          id: string;
+          name: string;
+          username: string;
+          department?: string;
+          jobTitle?: string;
+          profileImage?: string | null;
+        };
+        parentCommentId: string | null;
+        createdAt: string;
+        updatedAt: string;
+        replies: Array<any>;
+        replyCount: number;
+      }>>(`/blogs/${blogId}/comments`),
+
+    addComment: (blogId: string, content: string) =>
+      fetchApi<any>(`/blogs/${blogId}/comments`, {
+        method: 'POST',
+        body: JSON.stringify({ content }),
+      }),
+
+    addReply: (blogId: string, commentId: string, content: string) =>
+      fetchApi<any>(`/blogs/${blogId}/comments/${commentId}/replies`, {
+        method: 'POST',
+        body: JSON.stringify({ content }),
+      }),
+
+    deleteComment: (blogId: string, commentId: string) =>
+      fetchApi<void>(`/blogs/${blogId}/comments/${commentId}`, {
+        method: 'DELETE',
+      }),
+
+    // Reactions
+    getReactions: (blogId: string) =>
+      fetchApi<{
+        counts: {
+          like: number;
+          love: number;
+          insightful: number;
+          helpful: number;
+          [key: string]: number;
+        };
+        currentUserReaction: string | null;
+        totalReactions: number;
+      }>(`/blogs/${blogId}/reactions`),
+
+    react: (blogId: string, type: string) =>
+      fetchApi<{
+        counts: {
+          like: number;
+          love: number;
+          insightful: number;
+          helpful: number;
+          [key: string]: number;
+        };
+        currentUserReaction: string | null;
+        totalReactions: number;
+      }>(`/blogs/${blogId}/reactions`, {
+        method: 'POST',
+        body: JSON.stringify({ type }),
+      }),
+
+    removeReaction: (blogId: string) =>
+      fetchApi<any>(`/blogs/${blogId}/reactions`, {
+        method: 'DELETE',
+      }),
   },
 
   // Discussions
