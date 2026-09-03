@@ -118,8 +118,8 @@ public class KeycloakAdminService {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("username", username);
         payload.put("email", email);
-        payload.put("firstName", firstName != null ? firstName : username);
-        payload.put("lastName", lastName != null ? lastName : "");
+        payload.put("firstName", (firstName != null && !firstName.isBlank()) ? firstName : username);
+        payload.put("lastName", (lastName != null && !lastName.isBlank()) ? lastName : "User");
         payload.put("enabled", true);
         payload.put("emailVerified", true);
         if (password != null && !password.isBlank()) {
@@ -350,7 +350,7 @@ public class KeycloakAdminService {
         } catch (Exception e) {
             String msg = e.getMessage() != null ? e.getMessage().toLowerCase() : "";
             boolean isInvalidCreds = msg.contains("invalid user credentials") || msg.contains("invalid credentials");
-            if (!isInvalidCreds || msg.contains("account") || msg.contains("update_password") || msg.contains("action")) {
+            if (!isInvalidCreds && (msg.contains("account") || msg.contains("update_password") || msg.contains("action"))) {
                 return VerificationResult.UPDATE_PASSWORD_REQUIRED;
             }
             log.warn("Credential verification failed for user {}: {}", username, e.getMessage());
@@ -400,7 +400,7 @@ public class KeycloakAdminService {
         } catch (Exception e) {
             String msg = e.getMessage() != null ? e.getMessage().toLowerCase() : "";
             boolean isInvalidCreds = msg.contains("invalid user credentials") || msg.contains("invalid credentials");
-            if (!isInvalidCreds || msg.contains("account") || msg.contains("update_password") || msg.contains("action")) {
+            if (!isInvalidCreds && (msg.contains("account") || msg.contains("update_password") || msg.contains("action"))) {
                 Map<String, Object> res = new LinkedHashMap<>();
                 res.put("status", "UPDATE_PASSWORD_REQUIRED");
                 res.put("username", username);
@@ -410,20 +410,47 @@ public class KeycloakAdminService {
         }
     }
 
-    public void clearRequiredActions(String keycloakUserId) {
+    @SuppressWarnings("unchecked")
+    public void ensureProfileComplete(String keycloakUserId, String fallbackUsername) {
         if (!enabled || keycloakUserId == null) return;
         String token = adminToken();
         try {
-            restClient.put()
+            Map<String, Object> user = restClient.get()
                     .uri(baseUrl + "/admin/realms/" + realm + "/users/" + keycloakUserId)
                     .header("Authorization", "Bearer " + token)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(Map.of("requiredActions", List.of()))
                     .retrieve()
-                    .toBodilessEntity();
+                    .body(Map.class);
+            if (user != null) {
+                Map<String, Object> updates = new LinkedHashMap<>();
+                boolean needUpdate = false;
+                String firstName = (String) user.get("firstName");
+                String lastName = (String) user.get("lastName");
+                if (firstName == null || firstName.isBlank()) {
+                    updates.put("firstName", fallbackUsername != null && !fallbackUsername.isBlank() ? fallbackUsername : "User");
+                    needUpdate = true;
+                }
+                if (lastName == null || lastName.isBlank()) {
+                    updates.put("lastName", "User");
+                    needUpdate = true;
+                }
+                updates.put("requiredActions", List.of());
+                updates.put("emailVerified", true);
+                restClient.put()
+                        .uri(baseUrl + "/admin/realms/" + realm + "/users/" + keycloakUserId)
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(updates)
+                        .retrieve()
+                        .toBodilessEntity();
+            }
         } catch (Exception e) {
-            log.warn("Failed to clear requiredActions for user {}: {}", keycloakUserId, e.getMessage());
+            log.warn("Failed to ensure profile complete for user {}: {}", keycloakUserId, e.getMessage());
         }
+    }
+
+    public void clearRequiredActions(String keycloakUserId) {
+        if (!enabled || keycloakUserId == null) return;
+        ensureProfileComplete(keycloakUserId, "User");
     }
 
     @SuppressWarnings("unchecked")

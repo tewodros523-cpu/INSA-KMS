@@ -163,7 +163,7 @@ export const kmsApi = {
       newPassword: string;
       confirmPassword?: string;
     }) =>
-      fetchApi<{ message: string; status: string }>('/auth/forced-password-change', {
+      fetchApi<{ message: string; status: string; access_token?: string; refresh_token?: string }>('/auth/forced-password-change', {
         method: 'POST',
         body: JSON.stringify(data),
       }),

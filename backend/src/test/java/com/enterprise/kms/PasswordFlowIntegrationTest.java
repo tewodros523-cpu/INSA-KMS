@@ -318,7 +318,7 @@ class PasswordFlowIntegrationTest {
                 "confirmPassword", "PermanentPass123!"
         );
 
-        ResponseEntity<Map<String, String>> response = authController.forcedPasswordChange(req);
+        ResponseEntity<Map<String, Object>> response = authController.forcedPasswordChange(req);
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals("SUCCESS", response.getBody().get("status"));
         verify(keycloakAdminService).resetPassword(testSub, "PermanentPass123!", false);

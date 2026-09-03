@@ -13,6 +13,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 @RestController
@@ -73,7 +74,7 @@ public class AuthController {
     }
 
     @PostMapping("/forced-password-change")
-    public ResponseEntity<Map<String, String>> forcedPasswordChange(@RequestBody Map<String, String> body) {
+    public ResponseEntity<Map<String, Object>> forcedPasswordChange(@RequestBody Map<String, String> body) {
         String username = body.get("username");
         String currentPassword = body.get("currentPassword");
         String newPassword = body.get("newPassword");
@@ -110,17 +111,27 @@ public class AuthController {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Keycloak user ID could not be resolved");
         }
 
-        // 3. Reset password in Keycloak (temporary = false) and clear UPDATE_PASSWORD
+        // 3. Reset password in Keycloak (temporary = false), ensure non-blank name fields, and clear UPDATE_PASSWORD
         keycloakAdminService.resetPassword(keycloakUserId, newPassword, false);
+        keycloakAdminService.ensureProfileComplete(keycloakUserId, user.getUsername());
         keycloakAdminService.removeRequiredAction(keycloakUserId, "UPDATE_PASSWORD");
         keycloakAdminService.clearRequiredActions(keycloakUserId);
 
         auditService.recordAuditLog(user.getId().toString(), user.getEmail(), "USER_FORCED_PASSWORD_CHANGE", "USER", user.getId().toString(), "127.0.0.1", "{\"username\":\"" + username + "\"}");
 
-        return ResponseEntity.ok(Map.of(
-                "message", "Password changed successfully. You may now sign in.",
-                "status", "SUCCESS"
-        ));
+        // 4. Authenticate user immediately with the new password and return tokens
+        Map<String, Object> authResult;
+        try {
+            authResult = keycloakAdminService.authenticateUser(username.trim(), newPassword);
+        } catch (Exception e) {
+            log.warn("Immediate authentication after forced password change failed: {}", e.getMessage());
+            authResult = new LinkedHashMap<>();
+        }
+
+        Map<String, Object> res = new LinkedHashMap<>(authResult);
+        res.put("message", "Password changed successfully. You may now sign in.");
+        res.put("status", "SUCCESS");
+        return ResponseEntity.ok(res);
     }
 
     @PostMapping("/change-password")

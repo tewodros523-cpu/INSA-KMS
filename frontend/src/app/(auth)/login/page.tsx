@@ -138,21 +138,64 @@ export default function LoginPage() {
 
     setForcedLoading(true);
     try {
-      await kmsApi.auth.forcedPasswordChange({
+      const res = await kmsApi.auth.forcedPasswordChange({
         username: forcedUsername.trim(),
         currentPassword: forcedCurrentPassword,
         newPassword: forcedNewPassword,
         confirmPassword: forcedConfirmPassword,
       });
+
       setForcedSuccess('Password changed successfully! Signing in...');
-      // Update form values and automatically sign in
-      setUsername(forcedUsername);
+
+      let accessToken = res.access_token;
+      let refreshToken = res.refresh_token;
+
+      // Fallback: If token was not in the change response, authenticate directly with the new password
+      if (!accessToken) {
+        const loginRes = await kmsApi.auth.login(forcedUsername.trim(), forcedNewPassword);
+        accessToken = loginRes.access_token;
+        refreshToken = loginRes.refresh_token;
+      }
+
+      if (accessToken) {
+        sessionStorage.setItem('kms_access_token', accessToken);
+        if (refreshToken) {
+          sessionStorage.setItem('kms_refresh_token', refreshToken);
+        }
+        document.cookie = 'kms_auth_present=true; path=/; samesite=lax';
+
+        let redirectPath = '/library';
+        try {
+          const profileRes = await fetch(`${API_BASE_URL}/users/me`, {
+            headers: { Authorization: `Bearer ${accessToken}` },
+          });
+          if (profileRes.ok) {
+            const profile = await profileRes.json();
+            const roles: string[] = profile.roles || profile.realmRoles || [];
+            if (
+              roles.includes('ROLE_ADMIN') ||
+              roles.includes('ROLE_SYSTEM_ADMINISTRATOR') ||
+              roles.includes('SYSTEM_ADMINISTRATOR')
+            ) {
+              redirectPath = '/admin';
+            }
+          }
+        } catch {
+          // Default library redirect
+        }
+
+        setTimeout(() => {
+          setShowForcedModal(false);
+          window.location.href = redirectPath;
+        }, 500);
+        return;
+      }
+
+      // If somehow no token, update inputs and close modal so user can sign in manually
+      setUsername(forcedUsername.trim());
       setPassword(forcedNewPassword);
-      setTimeout(() => {
-        setShowForcedModal(false);
-        const formEl = document.querySelector('form');
-        if (formEl) formEl.requestSubmit();
-      }, 800);
+      setShowForcedModal(false);
+      setErrorMessage('Password updated successfully. Please click Sign In.');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to change password.';
       setForcedError(msg.replace(/^API Error \[\d+\]:\s*/, ''));
