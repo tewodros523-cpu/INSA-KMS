@@ -80,14 +80,21 @@ public class DocumentService {
                 });
 
         String effectiveDeptCode = (departmentCode != null && !departmentCode.isBlank()) ? departmentCode : "ITSEC";
-        Department dept = departmentRepository.findByCode(effectiveDeptCode)
-                .or(() -> departmentRepository.findByName(effectiveDeptCode))
-                .orElseGet(() -> {
-                    Department d = new Department();
-                    d.setName(effectiveDeptCode + " Department");
-                    d.setCode(effectiveDeptCode);
-                    return departmentRepository.save(d);
-                });
+        Department dept = null;
+        try {
+            UUID deptUuid = UUID.fromString(effectiveDeptCode);
+            dept = departmentRepository.findById(deptUuid).orElse(null);
+        } catch (Exception ignored) {}
+        if (dept == null) {
+            dept = departmentRepository.findByCode(effectiveDeptCode)
+                    .or(() -> departmentRepository.findByName(effectiveDeptCode))
+                    .orElseGet(() -> {
+                        Department d = new Department();
+                        d.setName(effectiveDeptCode + " Department");
+                        d.setCode(effectiveDeptCode);
+                        return departmentRepository.save(d);
+                    });
+        }
 
         String effectiveDocTypeName = (documentTypeName != null && !documentTypeName.isBlank()) ? documentTypeName : "Policy";
         DocumentType docType = documentTypeRepository.findByName(effectiveDocTypeName)
@@ -132,8 +139,11 @@ public class DocumentService {
             // extraction must never fail the upload
         }
         // FR-25: a freshly uploaded document goes straight into review (UNDER_REVIEW,
-        // hidden from the public library) with an auto-routed approval workflow.
-        approvalService.autoSubmitNewDocument(doc, username);
+        // hidden from the public library) with an auto-routed approval workflow if active.
+        boolean inWorkflow = approvalService.autoSubmitNewDocument(doc, username);
+        if (!inWorkflow) {
+            doc.setStatus("PUBLISHED");
+        }
         return documentRepository.save(doc);
     }
 
@@ -465,6 +475,7 @@ public class DocumentService {
         Department dept = doc.getOwnerDepartment();
         if (dept != null) {
             row.put("department", dept.getName() != null ? dept.getName() : "");
+            row.put("departmentId", dept.getId());
             Map<String, Object> deptMap = new LinkedHashMap<>();
             deptMap.put("id", dept.getId());
             deptMap.put("name", dept.getName() != null ? dept.getName() : "");
@@ -472,6 +483,7 @@ public class DocumentService {
             row.put("ownerDepartment", deptMap);
         } else {
             row.put("department", "");
+            row.put("departmentId", null);
             row.put("ownerDepartment", null);
         }
 

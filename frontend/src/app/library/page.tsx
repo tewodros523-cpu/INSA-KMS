@@ -26,7 +26,10 @@ import {
   BookOpen,
   Building2,
   Calendar,
-  HardDrive
+  HardDrive,
+  Search,
+  X,
+  ChevronDown
 } from 'lucide-react';
 import Link from 'next/link';
 import { kmsApi } from '@/src/lib/api';
@@ -119,10 +122,20 @@ export default function DocumentLibraryPage() {
   const [filterClass, setFilterClass] = useState('ALL');
   const [selectedDept, setSelectedDept] = useState('ALL');
   const [selectedDocType, setSelectedDocType] = useState('ALL');
+  const [selectedStatus, setSelectedStatus] = useState('ALL');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [collapsedDepts, setCollapsedDepts] = useState<Record<string, boolean>>({});
   const [departmentsList, setDepartmentsList] = useState<Array<{ id: string; name: string; code: string }>>([]);
   const [docTypesList, setDocTypesList] = useState<Array<{ id: string; name: string }>>([]);
   const [libraryMessage, setLibraryMessage] = useState<string | null>(null);
   const [folderCreating, setFolderCreating] = useState(false);
+
+  const toggleDeptCollapse = (deptName: string) => {
+    setCollapsedDepts((prev) => ({
+      ...prev,
+      [deptName]: !prev[deptName],
+    }));
+  };
 
   useEffect(() => {
     kmsApi.departments.getActive()
@@ -143,7 +156,9 @@ export default function DocumentLibraryPage() {
     page: number = currentPage,
     deptId: string = selectedDept,
     typeId: string = selectedDocType,
-    conf: string = filterClass
+    conf: string = filterClass,
+    status: string = selectedStatus,
+    query: string = searchQuery
   ) => {
     setIsLoading(true);
     setError(null);
@@ -151,6 +166,8 @@ export default function DocumentLibraryPage() {
       departmentId: deptId !== 'ALL' ? deptId : undefined,
       docTypeId: typeId !== 'ALL' ? typeId : undefined,
       confidentiality: conf !== 'ALL' ? conf : undefined,
+      status: status !== 'ALL' ? status : undefined,
+      search: query.trim() || undefined,
     };
     kmsApi.documents.list(page, PAGE_SIZE, filters)
       .then((data) => {
@@ -173,11 +190,11 @@ export default function DocumentLibraryPage() {
         setError(msg.includes('403') ? 'You do not have permission to view the document library.' : msg);
       })
       .finally(() => setIsLoading(false));
-  }, [currentPage, selectedDept, selectedDocType, filterClass]);
+  }, [currentPage, selectedDept, selectedDocType, filterClass, selectedStatus, searchQuery]);
 
   useEffect(() => {
-    loadDocuments(currentPage, selectedDept, selectedDocType, filterClass);
-  }, [loadDocuments, currentPage, selectedDept, selectedDocType, filterClass]);
+    loadDocuments(currentPage, selectedDept, selectedDocType, filterClass, selectedStatus, searchQuery);
+  }, [loadDocuments, currentPage, selectedDept, selectedDocType, filterClass, selectedStatus, searchQuery]);
 
   const handleCreateFolder = async () => {
     if (!newFolderName.trim()) return;
@@ -187,7 +204,7 @@ export default function DocumentLibraryPage() {
       setIsFolderModalOpen(false);
       setNewFolderName('');
       setLibraryMessage('Folder created successfully.');
-      loadDocuments(currentPage, selectedDept, selectedDocType, filterClass);
+      loadDocuments(currentPage, selectedDept, selectedDocType, filterClass, selectedStatus, searchQuery);
     } catch (err: unknown) {
       setLibraryMessage(err instanceof Error ? err.message : 'Failed to create folder');
     } finally {
@@ -199,10 +216,24 @@ export default function DocumentLibraryPage() {
     setSelectedDept('ALL');
     setSelectedDocType('ALL');
     setFilterClass('ALL');
+    setSelectedStatus('ALL');
+    setSearchQuery('');
     setCurrentPage(0);
   };
 
   const filteredDocs = documents;
+
+  const groupedDocs = React.useMemo(() => {
+    const map = new Map<string, ApiDocument[]>();
+    for (const doc of filteredDocs) {
+      const deptName = getDocDepartment(doc);
+      if (!map.has(deptName)) {
+        map.set(deptName, []);
+      }
+      map.get(deptName)!.push(doc);
+    }
+    return map;
+  }, [filteredDocs]);
 
   const columns = [
     {
@@ -329,6 +360,37 @@ export default function DocumentLibraryPage() {
               <span>Filters:</span>
             </div>
 
+            {/* Quick Search */}
+            <div className="relative w-full sm:w-44 md:w-52">
+              <Search className="w-3.5 h-3.5 text-kms-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Search library..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    setCurrentPage(0);
+                    loadDocuments(0, selectedDept, selectedDocType, filterClass, selectedStatus, searchQuery);
+                  }
+                }}
+                className="w-full text-xs pl-8 pr-7 py-1.5 border border-kms-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-600 focus:border-blue-600 bg-white"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setCurrentPage(0);
+                    loadDocuments(0, selectedDept, selectedDocType, filterClass, selectedStatus, '');
+                  }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-kms-slate-400 hover:text-kms-slate-600 p-0.5"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+
             {/* Department Filter */}
             <Select
               options={[
@@ -340,7 +402,7 @@ export default function DocumentLibraryPage() {
                 setSelectedDept(e.target.value);
                 setCurrentPage(0);
               }}
-              className="w-full sm:w-44 md:w-48"
+              className="w-full sm:w-40 md:w-44"
             />
 
             {/* Document Category Filter */}
@@ -354,7 +416,24 @@ export default function DocumentLibraryPage() {
                 setSelectedDocType(e.target.value);
                 setCurrentPage(0);
               }}
-              className="w-full sm:w-44 md:w-48"
+              className="w-full sm:w-40 md:w-44"
+            />
+
+            {/* Status Filter */}
+            <Select
+              options={[
+                { label: 'All Statuses', value: 'ALL' },
+                { label: 'PUBLISHED', value: 'PUBLISHED' },
+                { label: 'UNDER_REVIEW', value: 'UNDER_REVIEW' },
+                { label: 'DRAFT', value: 'DRAFT' },
+                { label: 'ARCHIVED', value: 'ARCHIVED' },
+              ]}
+              value={selectedStatus}
+              onChange={(e) => {
+                setSelectedStatus(e.target.value);
+                setCurrentPage(0);
+              }}
+              className="w-full sm:w-36 md:w-40"
             />
 
             {/* Classification Filter */}
@@ -371,10 +450,10 @@ export default function DocumentLibraryPage() {
                 setFilterClass(e.target.value);
                 setCurrentPage(0);
               }}
-              className="w-full sm:w-40 md:w-44"
+              className="w-full sm:w-36 md:w-40"
             />
 
-            {(selectedDept !== 'ALL' || selectedDocType !== 'ALL' || filterClass !== 'ALL') && (
+            {(selectedDept !== 'ALL' || selectedDocType !== 'ALL' || filterClass !== 'ALL' || selectedStatus !== 'ALL' || searchQuery) && (
               <button
                 onClick={handleResetFilters}
                 className="text-xs text-blue-700 hover:text-blue-900 font-medium underline px-1"
@@ -441,158 +520,196 @@ export default function DocumentLibraryPage() {
                 />
               ) : (
                 <>
-                  {viewMode === 'grid' ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5">
-                      {filteredDocs.map((doc: ApiDocument & { isArticle?: boolean; knowledgeType?: string }) => {
-                        const isArt = doc.isArticle || doc.fileName?.endsWith('.md') || doc.knowledgeType === 'SOP';
-                        const coverImg = isArt ? extractArticleCoverImage(doc) : null;
-                        const targetUrl = isArt ? `/articles/${doc.id}` : `/preview/${doc.id}`;
-                        const cls = getDocClassification(doc);
-                        const dept = getDocDepartment(doc);
-                        const versionStr = getDocVersionString(doc);
-                        const sizeStr = formatFileSize(getDocSizeBytes(doc));
-
-                        return (
-                          <div
-                            key={doc.id}
-                            className="bg-white/95 backdrop-blur-xs border border-kms-slate-200/90 hover:border-blue-500/70 rounded-2xl overflow-hidden shadow-2xs hover:shadow-xl transition-all duration-300 flex flex-col justify-between group hover:-translate-y-1"
-                          >
-                            <div>
-                              {/* Top Banner Header: Cover Image vs Color Accent Header */}
-                              {coverImg ? (
-                                <div className="relative h-48 w-full bg-kms-slate-950 overflow-hidden">
-                                  <img
-                                    src={coverImg}
-                                    alt={doc.title || 'Article Cover'}
-                                    className="w-full h-full object-cover group-hover:scale-108 transition-transform duration-700 opacity-90"
-                                    onError={(e) => {
-                                      (e.currentTarget.parentElement as HTMLElement).style.display = 'none';
-                                    }}
-                                  />
-                                  {/* Multi-stop gradient overlay for max contrast & legibility */}
-                                  <div className="absolute inset-0 bg-gradient-to-t from-kms-slate-950 via-kms-slate-900/50 to-black/30 p-4 flex flex-col justify-between">
-                                    <div className="flex items-center justify-between gap-2">
-                                      <div className="flex items-center gap-1.5">
-                                        <Badge label={doc.knowledgeType || 'ARTICLE'} variant="blue" />
-                                        <Badge label={cls} classification={cls} />
-                                      </div>
-                                      {doc.isCheckedOut && <Badge label="CHECKED OUT" stateBadge="CHECKED_OUT" />}
-                                    </div>
-
-                                    <div className="space-y-1">
-                                      <div className="flex items-center gap-1.5 text-[10px] text-blue-200 font-semibold uppercase tracking-wider">
-                                        <BookOpen className="w-3 h-3 text-blue-300" />
-                                        <span>Knowledge Article</span>
-                                      </div>
-                                      <Link
-                                        href={targetUrl}
-                                        className="text-base font-extrabold text-white group-hover:text-blue-200 transition-colors line-clamp-2 leading-snug drop-shadow-md"
-                                      >
-                                        {doc.title || doc.fileName || doc.id}
-                                      </Link>
-                                    </div>
-                                  </div>
-                                </div>
-                              ) : (
-                                <div className="p-5 pb-3 space-y-3">
-                                  <div className="flex items-center justify-between gap-2">
-                                    <div className="flex items-center gap-1.5">
-                                      <Badge label={doc.knowledgeType || (isArt ? 'ARTICLE' : 'DOCUMENT')} variant={isArt ? 'blue' : 'slate'} />
-                                      <Badge label={cls} classification={cls} />
-                                    </div>
-                                    {doc.isCheckedOut && <Badge label="CHECKED OUT" stateBadge="CHECKED_OUT" />}
-                                  </div>
-
-                                  <div className="flex items-start gap-3.5 pt-1">
-                                    <div className={`p-3 rounded-xl shrink-0 shadow-xs transition-transform group-hover:rotate-3 ${
-                                      isArt 
-                                        ? 'bg-gradient-to-br from-emerald-500 to-teal-700 text-white shadow-emerald-200/50' 
-                                        : 'bg-gradient-to-br from-blue-600 to-indigo-700 text-white shadow-blue-200/50'
-                                    }`}>
-                                      {isArt ? <BookOpen className="w-5 h-5" /> : <FileText className="w-5 h-5" />}
-                                    </div>
-
-                                    <div className="flex-1 min-w-0">
-                                      <Link
-                                        href={targetUrl}
-                                        className="text-base font-extrabold text-kms-slate-900 group-hover:text-blue-700 transition-colors line-clamp-2 leading-snug"
-                                      >
-                                        {doc.title || doc.fileName || doc.id}
-                                      </Link>
-                                    </div>
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* Card Body Details */}
-                              <div className="p-5 pt-2 space-y-3">
-                                {/* Department & Meta Pill Bar */}
-                                <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-kms-slate-600 pt-2 border-t border-kms-slate-100">
-                                  <div className="flex items-center gap-1.5 bg-kms-slate-50 px-2.5 py-1 rounded-md border border-kms-slate-200/70 font-medium">
-                                    <Building2 className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                                    <span className="truncate max-w-[120px]">{dept}</span>
-                                  </div>
-
-                                  <div className="flex items-center gap-1 font-mono text-[10px] font-bold bg-blue-50 text-blue-800 px-2 py-1 rounded-md border border-blue-200/60">
-                                    <span>{versionStr}</span>
-                                  </div>
-                                </div>
-
-                                {/* Additional Stats Strip */}
-                                <div className="flex items-center justify-between text-[11px] text-kms-slate-500 font-medium px-0.5">
-                                  <div className="flex items-center gap-1.5">
-                                    <Calendar className="w-3.5 h-3.5 text-kms-slate-400 shrink-0" />
-                                    <span>{new Date(doc.updatedAt || Date.now()).toLocaleDateString()}</span>
-                                  </div>
-
-                                  <div className="flex items-center gap-1.5">
-                                    <HardDrive className="w-3.5 h-3.5 text-kms-slate-400 shrink-0" />
-                                    <span>{sizeStr}</span>
-                                  </div>
-                                </div>
-                              </div>
+                <div className="space-y-6">
+                  {Array.from(groupedDocs.entries()).map(([deptName, docsInDept]) => {
+                    const isCollapsed = collapsedDepts[deptName] || false;
+                    return (
+                      <div key={deptName} className="space-y-3.5">
+                        {/* Department Group Banner */}
+                        <div
+                          onClick={() => toggleDeptCollapse(deptName)}
+                          className="flex items-center justify-between bg-gradient-to-r from-blue-50/70 via-white to-kms-slate-50 border border-kms-slate-200/90 hover:border-blue-300 rounded-xl px-4 py-2.5 shadow-2xs cursor-pointer transition-all select-none"
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <div className="p-1.5 rounded-lg bg-blue-600 text-white shadow-xs">
+                              <Building2 className="w-4 h-4" />
                             </div>
-
-                            {/* Card Footer Actions */}
-                            <div className="p-5 pt-0">
-                              <div className="flex items-center justify-between gap-2 pt-3 border-t border-kms-slate-100">
-                                <Link href={targetUrl} className="flex-1">
-                                  <button className={`w-full text-xs font-bold py-2.5 px-3 rounded-xl transition-all duration-200 flex items-center justify-center gap-2 shadow-xs group-hover:shadow-md ${
-                                    isArt
-                                      ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white'
-                                      : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white'
-                                  }`}>
-                                    {isArt ? <BookOpen className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                                    <span>{isArt ? 'Read Article' : 'Preview Document'}</span>
-                                  </button>
-                                </Link>
-
-                                <div className="flex items-center gap-1">
-                                  <Link href={`/share/${doc.id}`}>
-                                    <button title="Share Document" className="p-2 text-kms-slate-500 hover:text-blue-700 hover:bg-blue-50 rounded-lg border border-kms-slate-200/80 transition-colors">
-                                      <Share2 className="w-4 h-4" />
-                                    </button>
-                                  </Link>
-                                  <Link href={`/versions/${doc.id}`}>
-                                    <button title="Version History" className="p-2 text-kms-slate-500 hover:text-purple-700 hover:bg-purple-50 rounded-lg border border-kms-slate-200/80 transition-colors">
-                                      <History className="w-4 h-4" />
-                                    </button>
-                                  </Link>
-                                </div>
-                              </div>
+                            <div className="flex items-center gap-2.5">
+                              <h2 className="text-sm font-bold text-kms-slate-900 tracking-tight">
+                                {deptName}
+                              </h2>
+                              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-blue-100/80 text-blue-800 border border-blue-200/60">
+                                {docsInDept.length} {docsInDept.length === 1 ? 'document' : 'documents'}
+                              </span>
                             </div>
                           </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <Table
-                      columns={columns}
-                      data={filteredDocs}
-                      keyExtractor={(item: ApiDocument) => item.id}
-                      emptyText="No documents match your active filters."
-                    />
-                  )}
+                          <button
+                            type="button"
+                            className="text-kms-slate-400 hover:text-kms-slate-700 p-1"
+                            title={isCollapsed ? 'Expand Department' : 'Collapse Department'}
+                          >
+                            <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${isCollapsed ? '-rotate-90' : ''}`} />
+                          </button>
+                        </div>
+
+                        {/* Department Content */}
+                        {!isCollapsed && (
+                          viewMode === 'grid' ? (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5">
+                              {docsInDept.map((doc: ApiDocument & { isArticle?: boolean; knowledgeType?: string }) => {
+                                const isArt = doc.isArticle || doc.fileName?.endsWith('.md') || doc.knowledgeType === 'SOP';
+                                const coverImg = isArt ? extractArticleCoverImage(doc) : null;
+                                const targetUrl = isArt ? `/articles/${doc.id}` : `/preview/${doc.id}`;
+                                const cls = getDocClassification(doc);
+                                const dept = getDocDepartment(doc);
+                                const versionStr = getDocVersionString(doc);
+                                const sizeStr = formatFileSize(getDocSizeBytes(doc));
+
+                                return (
+                                  <div
+                                    key={doc.id}
+                                    className="bg-white/95 backdrop-blur-xs border border-kms-slate-200/90 hover:border-blue-500/70 rounded-2xl overflow-hidden shadow-2xs hover:shadow-xl transition-all duration-300 flex flex-col justify-between group hover:-translate-y-1"
+                                  >
+                                    <div>
+                                      {/* Top Banner Header: Cover Image vs Color Accent Header */}
+                                      {coverImg ? (
+                                        <div className="relative h-48 w-full bg-kms-slate-950 overflow-hidden">
+                                          <img
+                                            src={coverImg}
+                                            alt={doc.title || 'Article Cover'}
+                                            className="w-full h-full object-cover group-hover:scale-108 transition-transform duration-700 opacity-90"
+                                            onError={(e) => {
+                                              (e.currentTarget.parentElement as HTMLElement).style.display = 'none';
+                                            }}
+                                          />
+                                          <div className="absolute inset-0 bg-gradient-to-t from-kms-slate-950 via-kms-slate-900/50 to-black/30 p-4 flex flex-col justify-between">
+                                            <div className="flex items-center justify-between gap-2">
+                                              <div className="flex items-center gap-1.5">
+                                                <Badge label={doc.knowledgeType || 'ARTICLE'} variant="blue" />
+                                                <Badge label={cls} classification={cls} />
+                                              </div>
+                                              {doc.isCheckedOut && <Badge label="CHECKED OUT" stateBadge="CHECKED_OUT" />}
+                                            </div>
+
+                                            <div className="space-y-1">
+                                              <div className="flex items-center gap-1.5 text-[10px] text-blue-200 font-semibold uppercase tracking-wider">
+                                                <BookOpen className="w-3 h-3 text-blue-300" />
+                                                <span>Knowledge Article</span>
+                                              </div>
+                                              <Link
+                                                href={targetUrl}
+                                                className="text-base font-extrabold text-white group-hover:text-blue-200 transition-colors line-clamp-2 leading-snug drop-shadow-md"
+                                              >
+                                                {doc.title || doc.fileName || doc.id}
+                                              </Link>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        <div className="p-5 pb-3 space-y-3">
+                                          <div className="flex items-center justify-between gap-2">
+                                            <div className="flex items-center gap-1.5">
+                                              <Badge label={doc.knowledgeType || (isArt ? 'ARTICLE' : 'DOCUMENT')} variant={isArt ? 'blue' : 'slate'} />
+                                              <Badge label={cls} classification={cls} />
+                                            </div>
+                                            {doc.isCheckedOut && <Badge label="CHECKED OUT" stateBadge="CHECKED_OUT" />}
+                                          </div>
+
+                                          <div className="flex items-start gap-3.5 pt-1">
+                                            <div className={`p-3 rounded-xl shrink-0 shadow-xs transition-transform group-hover:rotate-3 ${
+                                              isArt 
+                                                ? 'bg-gradient-to-br from-emerald-500 to-teal-700 text-white shadow-emerald-200/50' 
+                                                : 'bg-gradient-to-br from-blue-600 to-indigo-700 text-white shadow-blue-200/50'
+                                            }`}>
+                                              {isArt ? <BookOpen className="w-5 h-5" /> : <FileText className="w-5 h-5" />}
+                                            </div>
+
+                                            <div className="flex-1 min-w-0">
+                                              <Link
+                                                href={targetUrl}
+                                                className="text-base font-extrabold text-kms-slate-900 group-hover:text-blue-700 transition-colors line-clamp-2 leading-snug"
+                                              >
+                                                {doc.title || doc.fileName || doc.id}
+                                              </Link>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      )}
+
+                                      {/* Card Body Details */}
+                                      <div className="p-5 pt-2 space-y-3">
+                                        {/* Department & Meta Pill Bar */}
+                                        <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-kms-slate-600 pt-2 border-t border-kms-slate-100">
+                                          <div className="flex items-center gap-1.5 bg-kms-slate-50 px-2.5 py-1 rounded-md border border-kms-slate-200/70 font-medium">
+                                            <Building2 className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                                            <span className="truncate max-w-[120px]">{dept}</span>
+                                          </div>
+
+                                          <div className="flex items-center gap-1 font-mono text-[10px] font-bold bg-blue-50 text-blue-800 px-2 py-1 rounded-md border border-blue-200/60">
+                                            <span>{versionStr}</span>
+                                          </div>
+                                        </div>
+
+                                        {/* Additional Stats Strip */}
+                                        <div className="flex items-center justify-between text-[11px] text-kms-slate-500 font-medium px-0.5">
+                                          <div className="flex items-center gap-1.5">
+                                            <Calendar className="w-3.5 h-3.5 text-kms-slate-400 shrink-0" />
+                                            <span>{new Date(doc.updatedAt || Date.now()).toLocaleDateString()}</span>
+                                          </div>
+
+                                          <div className="flex items-center gap-1.5">
+                                            <HardDrive className="w-3.5 h-3.5 text-kms-slate-400 shrink-0" />
+                                            <span>{sizeStr}</span>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    {/* Card Footer Actions */}
+                                    <div className="p-5 pt-0">
+                                      <div className="flex items-center justify-between gap-2 pt-3 border-t border-kms-slate-100">
+                                        <Link href={targetUrl} className="flex-1">
+                                          <button className={`w-full text-xs font-bold py-2.5 px-3 rounded-xl transition-all duration-200 flex items-center justify-center gap-2 shadow-xs group-hover:shadow-md ${
+                                            isArt
+                                              ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white'
+                                              : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white'
+                                          }`}>
+                                            {isArt ? <BookOpen className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                            <span>{isArt ? 'Read Article' : 'Preview Document'}</span>
+                                          </button>
+                                        </Link>
+
+                                        <div className="flex items-center gap-1">
+                                          <Link href={`/share/${doc.id}`}>
+                                            <button title="Share Document" className="p-2 text-kms-slate-500 hover:text-blue-700 hover:bg-blue-50 rounded-lg border border-kms-slate-200/80 transition-colors">
+                                              <Share2 className="w-4 h-4" />
+                                            </button>
+                                          </Link>
+                                          <Link href={`/versions/${doc.id}`}>
+                                            <button title="Version History" className="p-2 text-kms-slate-500 hover:text-purple-700 hover:bg-purple-50 rounded-lg border border-kms-slate-200/80 transition-colors">
+                                              <History className="w-4 h-4" />
+                                            </button>
+                                          </Link>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <Table
+                              columns={columns}
+                              data={docsInDept}
+                              keyExtractor={(item: ApiDocument) => item.id}
+                              emptyText="No documents match your active filters in this department."
+                            />
+                          )
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
 
                   <Pagination
                     currentPage={currentPage + 1}

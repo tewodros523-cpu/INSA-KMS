@@ -136,7 +136,7 @@ public class PermissionService {
             caller.departmentId = user.getDepartment().getId().toString();
         }
 
-        if (user.getId() != null) {
+        if (user.getId() != null && entityManager != null) {
             @SuppressWarnings("unchecked")
             List<Object> groups = entityManager
                     .createNativeQuery("SELECT ug.group_id FROM user_groups ug WHERE ug.user_id = :userId")
@@ -189,11 +189,24 @@ public class PermissionService {
         // FR-19: confidentiality label defaults when no explicit grant exists
         String label = doc.getConfidentialityLevel() != null ? doc.getConfidentialityLevel().toUpperCase() : "INTERNAL";
         boolean sameDepartment = doc.getOwnerDepartment() != null && caller.departmentId != null
+                && !caller.departmentId.equals("00000000-0000-0000-0000-000000000000")
                 && doc.getOwnerDepartment().getId().toString().equals(caller.departmentId);
 
+        boolean isConfidentialAuthorized = sameDepartment && (
+                caller.roles.contains("ROLE_CONTENT_OWNER")
+                || caller.roles.contains("CONTENT_OWNER")
+                || caller.roles.contains("ROLE_MANAGER")
+                || caller.roles.contains("ROLE_CONFIDENTIAL_VIEWER")
+                || (caller.user != null && ("ROLE_CONTENT_OWNER".equals(caller.user.getRoleName())
+                                         || "CONTENT_OWNER".equals(caller.user.getRoleName())
+                                         || "ROLE_MANAGER".equals(caller.user.getRoleName())
+                                         || "ROLE_CONFIDENTIAL_VIEWER".equals(caller.user.getRoleName())))
+        );
+
         return switch (label) {
-            case "PUBLIC", "INTERNAL" -> VIEW;
-            case "CONFIDENTIAL" -> (sameDepartment || caller.isOversight) ? VIEW : null;
+            case "PUBLIC" -> VIEW;
+            case "INTERNAL" -> sameDepartment ? VIEW : null;
+            case "CONFIDENTIAL" -> (isConfidentialAuthorized || caller.isOversight) ? VIEW : null;
             case "RESTRICTED" -> caller.isOversight ? VIEW : null;
             default -> null;
         };
@@ -263,10 +276,24 @@ public class PermissionService {
             String label = folder.getConfidentialityLevel() != null
                     ? folder.getConfidentialityLevel().toUpperCase() : "INTERNAL";
             boolean sameDepartment = folder.getDepartment() != null && caller.departmentId != null
+                    && !caller.departmentId.equals("00000000-0000-0000-0000-000000000000")
                     && folder.getDepartment().getId().toString().equals(caller.departmentId);
+
+            boolean isConfidentialAuthorized = sameDepartment && (
+                    caller.roles.contains("ROLE_CONTENT_OWNER")
+                    || caller.roles.contains("CONTENT_OWNER")
+                    || caller.roles.contains("ROLE_MANAGER")
+                    || caller.roles.contains("ROLE_CONFIDENTIAL_VIEWER")
+                    || (caller.user != null && ("ROLE_CONTENT_OWNER".equals(caller.user.getRoleName())
+                                             || "CONTENT_OWNER".equals(caller.user.getRoleName())
+                                             || "ROLE_MANAGER".equals(caller.user.getRoleName())
+                                             || "ROLE_CONFIDENTIAL_VIEWER".equals(caller.user.getRoleName())))
+            );
+
             boolean labelAllowsView = switch (label) {
-                case "PUBLIC", "INTERNAL" -> true;
-                case "CONFIDENTIAL" -> sameDepartment || caller.isOversight;
+                case "PUBLIC" -> true;
+                case "INTERNAL" -> sameDepartment;
+                case "CONFIDENTIAL" -> isConfidentialAuthorized || caller.isOversight;
                 case "RESTRICTED" -> caller.isOversight;
                 default -> false;
             };

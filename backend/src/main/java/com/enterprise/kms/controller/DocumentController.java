@@ -126,19 +126,26 @@ public class DocumentController {
             @RequestParam(name = "documentTypeId", required = false) String documentTypeId,
             @RequestParam(name = "confidentiality", required = false) String confidentiality,
             @RequestParam(name = "classification", required = false) String classification,
+            @RequestParam(name = "status", required = false) String status,
+            @RequestParam(name = "q", required = false) String q,
+            @RequestParam(name = "query", required = false) String query,
+            @RequestParam(name = "search", required = false) String search,
             Pageable pageable) {
         String rawDept = (departmentId != null && !departmentId.isBlank()) ? departmentId : deptId;
         String rawDocType = (docTypeId != null && !docTypeId.isBlank()) ? docTypeId : documentTypeId;
         String rawConf = (confidentiality != null && !confidentiality.isBlank()) ? confidentiality : classification;
+        String rawQuery = (search != null && !search.isBlank()) ? search : ((q != null && !q.isBlank()) ? q : query);
 
         String effectiveDeptId = (rawDept != null && !rawDept.isBlank() && !"ALL".equalsIgnoreCase(rawDept.trim())) ? rawDept.trim() : null;
         String effectiveDocTypeId = (rawDocType != null && !rawDocType.isBlank() && !"ALL".equalsIgnoreCase(rawDocType.trim())) ? rawDocType.trim() : null;
         String effectiveConf = (rawConf != null && !rawConf.isBlank() && !"ALL".equalsIgnoreCase(rawConf.trim())) ? rawConf.trim() : null;
+        String effectiveQuery = (rawQuery != null && !rawQuery.isBlank()) ? rawQuery.trim() : null;
+        String effectiveStatus = (status != null && !status.isBlank() && !"ALL".equalsIgnoreCase(status.trim())) ? status.trim().toUpperCase() : null;
 
-        boolean hasFilter = effectiveDeptId != null || effectiveDocTypeId != null || effectiveConf != null;
+        boolean hasFilter = effectiveDeptId != null || effectiveDocTypeId != null || effectiveConf != null || effectiveQuery != null || effectiveStatus != null;
         if (hasFilter) {
             return ResponseEntity.ok(searchService.searchDocuments(
-                    null,
+                    effectiveQuery,
                     effectiveDocTypeId,
                     effectiveDeptId,
                     effectiveConf,
@@ -146,6 +153,17 @@ public class DocumentController {
             ).map(documentService::toResponse));
         }
         return ResponseEntity.ok(documentService.getAllActiveDocumentResponses(pageable));
+    }
+
+    public ResponseEntity<Page<java.util.Map<String, Object>>> getAllDocuments(
+            String departmentId,
+            String deptId,
+            String docTypeId,
+            String documentTypeId,
+            String confidentiality,
+            String classification,
+            Pageable pageable) {
+        return getAllDocuments(departmentId, deptId, docTypeId, documentTypeId, confidentiality, classification, null, null, null, null, pageable);
     }
 
     /** My Documents — authored by the caller. */
@@ -340,7 +358,7 @@ public class DocumentController {
     public ResponseEntity<org.springframework.core.io.Resource> downloadDocument(
             @PathVariable UUID id,
             @RequestParam(name = "disposition", defaultValue = "attachment") String disposition) {
-
+        permissionService.requireDocumentAccess(id, PermissionService.VIEW);
         java.util.Map<String, Object> payload = documentService.prepareDownload(id);
         java.nio.file.Path path = (java.nio.file.Path) payload.get("path");
         String fileName = String.valueOf(payload.get("fileName"));
@@ -514,6 +532,7 @@ public class DocumentController {
     @PreAuthorize("hasAnyRole('ROLE_VIEWER', 'ROLE_CONTRIBUTOR', 'ROLE_CONTENT_OWNER', 'ROLE_COMPLIANCE_OFFICER', 'ROLE_IT_SECURITY', 'ROLE_ADMIN')")
     @AuditLog(action = "DOCUMENT_PREVIEW", resourceType = "DOCUMENT")
     public ResponseEntity<org.springframework.core.io.Resource> previewDocument(@PathVariable UUID id) {
+        permissionService.requireDocumentAccess(id, PermissionService.VIEW);
         java.util.Map<String, Object> payload = documentService.prepareDownload(id);
         java.nio.file.Path path = (java.nio.file.Path) payload.get("path");
         String fileName = String.valueOf(payload.get("fileName"));

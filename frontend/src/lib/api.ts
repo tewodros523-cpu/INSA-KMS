@@ -189,12 +189,17 @@ export const kmsApi = {
     list: (
       page = 0,
       size = 10,
-      filters?: { departmentId?: string; docTypeId?: string; confidentiality?: string }
+      filters?: { departmentId?: string; docTypeId?: string; confidentiality?: string; status?: string; search?: string }
     ) => {
       const params = new URLSearchParams({ page: String(page), size: String(size) });
       if (filters?.departmentId) params.set('departmentId', filters.departmentId);
       if (filters?.docTypeId) params.set('docTypeId', filters.docTypeId);
       if (filters?.confidentiality && filters.confidentiality !== 'ALL') params.set('confidentiality', filters.confidentiality);
+      if (filters?.status && filters.status !== 'ALL') params.set('status', filters.status);
+      if (filters?.search && filters.search.trim()) {
+        params.set('q', filters.search.trim());
+        params.set('search', filters.search.trim());
+      }
       return fetchApi<any>(`/documents?${params.toString()}`);
     },
     mine: (page = 0, size = 20) => fetchApi<any>(`/documents/mine?page=${page}&size=${size}`),

@@ -128,8 +128,13 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
             "             (fp.subject_type = 'USER'  AND fp.subject_id = :userId) " +
             "          OR (fp.subject_type = 'ROLE'  AND fp.subject_id = ANY(string_to_array(:roles, ','))) " +
             "          OR (fp.subject_type = 'GROUP' AND fp.subject_id = ANY(string_to_array(:groups, ','))) ) )) " +
-            "   OR d.confidentiality_level::text IN ('PUBLIC', 'INTERNAL') " +
-            "   OR (d.confidentiality_level::text = 'CONFIDENTIAL' AND d.owner_department_id = CAST(:departmentId AS uuid)) " +
+            "   OR d.confidentiality_level::text = 'PUBLIC' " +
+            "   OR (d.confidentiality_level::text = 'INTERNAL' AND :departmentId IS NOT NULL AND :departmentId != '00000000-0000-0000-0000-000000000000' AND d.owner_department_id = CAST(:departmentId AS uuid)) " +
+            "   OR (d.confidentiality_level::text = 'CONFIDENTIAL' AND :departmentId IS NOT NULL AND :departmentId != '00000000-0000-0000-0000-000000000000' AND d.owner_department_id = CAST(:departmentId AS uuid) AND ( " +
+            "        'ROLE_CONTENT_OWNER' = ANY(string_to_array(:roles, ',')) " +
+            "     OR 'CONTENT_OWNER' = ANY(string_to_array(:roles, ',')) " +
+            "     OR 'ROLE_MANAGER' = ANY(string_to_array(:roles, ',')) " +
+            "     OR 'ROLE_CONFIDENTIAL_VIEWER' = ANY(string_to_array(:roles, ',')) )) " +
             " ) ";
 
     @Query(value = "SELECT d.* FROM documents d " +
